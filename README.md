@@ -14,6 +14,8 @@ It's a single static page (`index.html`) with no build step. Open it directly in
 - **Takes**: generate multiple takes of the same phrase and pick one to compare. Changing the score, voice, model or generation parameters marks affected phrases for re-rendering.
 - **Generation parameters**: `cfg_value`, `inference_timesteps`, `temperature`, `fsq_temperature`, `prompt_max_frames`, `max_len`, `lyrics_only`, and seed. Includes stable / balanced / vivid presets.
 - **Validation**: non-Chinese lyrics, a melisma with no preceding character, over-limit phrases, and out-of-range notes are flagged in real time, with jump-to-location.
+- **Pitch curves**: after a phrase renders, the take's actual pitch (F0) curve is drawn over the notes, showing glides, vibrato and note-end falls. If the score changes afterwards the curve turns dashed for comparison. Uses `f0` from the job response when present; otherwise the frontend extracts it from the result audio with YIN.
+- **Piano preview**: clicking or dragging notes, and playing unrendered phrases, uses a synthesized piano with light room reverb.
 - **Other**: backing track import with synced playback, VocalRender label JSON import, undo/redo, keyboard shortcuts (press `?`), and autosave to browser local storage.
 
 ## Service API
@@ -25,7 +27,7 @@ By default the page runs in **demo mode** (rendering is simulated locally, and p
 | GET | `/voices` | Built-in reference voices |
 | POST | `/voices` | Upload reference audio (multipart), returns `upload_id` |
 | POST | `/render` | Submit a phrase for rendering, returns `job_id` |
-| GET | `/jobs/{job_id}` | `status`: queued / running / succeeded / failed, `progress` 0–1, `audio_url` |
+| GET | `/jobs/{job_id}` | `status`: queued / running / succeeded / failed, `progress` 0–1, `audio_url`; optional `f0: {hop_s, hz[]}` (0 = unvoiced) |
 | GET | `/jobs/{job_id}/audio` | 48 kHz WAV |
 | POST | `/score/import` | Parse ABC / MusicXML into word·pitch·note·pitch2word |
 | GET | `/health` | Connection test |
