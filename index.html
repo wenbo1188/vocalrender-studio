@@ -89,7 +89,8 @@ svg.i{width:16px;height:16px;flex:none}
 .proj:hover,.proj:focus{border-color:var(--line-2);background:var(--raised)}
 .transport{display:flex;align-items:center;gap:4px;margin-inline:auto;background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:3px;flex:none}
 .transport .play{background:var(--fg);color:var(--panel)}
-.tc{display:flex;flex-direction:column;align-items:flex-start;padding:0 10px;line-height:1.15;min-width:116px}
+.tc{display:grid;grid-template-columns:auto auto;column-gap:6px;align-items:baseline;padding:0 10px;line-height:1.2;min-width:130px;cursor:help}
+.tc .tl{font-size:9.5px;color:var(--fg-3);letter-spacing:.04em;text-align:right}
 .tc .big{font-size:14px;font-weight:600}
 .tc .small{font-size:10.5px;color:var(--fg-3)}
 .field-mini{display:flex;align-items:center;gap:4px;padding:0 6px;color:var(--fg-3);font-size:11px}
@@ -325,7 +326,7 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
       <button class="btn icon" id="btnHome" title="回到开头 (Home)"></button>
       <button class="btn icon play" id="btnPlay" title="播放 / 暂停 (Space)"></button>
       <button class="btn icon" id="btnStop" title="停止并回到开头 (Esc)"></button>
-      <div class="tc"><span class="big mono" id="tcBar">1.1.000</span><span class="small mono" id="tcTime">00:00.000</span></div>
+      <div class="tc" title="播放头位置&#10;小节：小节.拍.tick（每拍 960 tick）&#10;时间：分:秒.毫秒，按当前 BPM 换算"><span class="tl">小节</span><span class="big mono" id="tcBar">1.1.000</span><span class="tl">时间</span><span class="small mono" id="tcTime">00:00.000</span></div>
       <label class="field-mini">BPM <input id="bpm" type="number" min="40" max="240" step="1" value="90"></label>
       <label class="field-mini">拍号 <select id="bpb"><option value="4">4/4</option><option value="3">3/4</option><option value="2">2/4</option><option value="6">6/8</option></select></label>
     </div>
