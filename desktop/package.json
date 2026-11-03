@@ -1,0 +1,68 @@
+{
+  "name": "vocalrender-studio-desktop",
+  "productName": "VocalRender Studio",
+  "version": "1.0.0",
+  "description": "VocalRender 歌声合成编辑器 Windows 桌面版",
+  "author": "wenbo1188",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "sync": "node scripts/sync-web.js",
+    "start": "npm run sync && electron .",
+    "dist": "npm run sync && electron-builder --win --x64 --publish never",
+    "dist:setup": "npm run sync && electron-builder --win nsis --x64 --publish never",
+    "dist:portable": "npm run sync && electron-builder --win portable --x64 --publish never",
+    "dist:dir": "npm run sync && electron-builder --win dir --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.wenbo1188.vocalrenderstudio",
+    "productName": "VocalRender Studio",
+    "copyright": "Copyright © 2026 wenbo1188",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "build/icon.ico",
+      "build/icon.png"
+    ],
+    "fileAssociations": [
+      {
+        "ext": "vrproj",
+        "name": "VocalRender.Project",
+        "description": "VocalRender Studio 工程",
+        "role": "Editor",
+        "icon": "build/icon.ico"
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VocalRender Studio",
+      "uninstallDisplayName": "VocalRender Studio",
+      "installerLanguages": ["zh_CN"],
+      "language": "2052",
+      "artifactName": "VocalRender-Studio-${version}-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "VocalRender-Studio-${version}-Portable.${ext}"
+    }
+  }
+}

@@ -6,6 +6,14 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
 <title>VocalRender Studio</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<script>
+/* Desktop shell detection: runs before first paint so the Windows skin applies immediately */
+(function(){var d=window.vrDesktop;if(!d||!d.info)return;var c=document.documentElement.classList;c.add('desktop','win11');if(d.info.mica)c.add('mica');
+ window.__vrAccent=function(hex){if(!/^#?[0-9a-f]{6}/i.test(hex||''))return;hex=hex.replace('#','').slice(0,6);var rgb=[0,2,4].map(function(i){return parseInt(hex.substr(i,2),16)});
+  function mix(a){return '#'+rgb.map(function(v){var x=Math.round(a>0?v+(255-v)*a:v*(1+a));return ('0'+Math.max(0,Math.min(255,x)).toString(16)).slice(-2)}).join('')}
+  var s=document.documentElement.style;s.setProperty('--sys-accent-light',mix(-.2));s.setProperty('--sys-accent-dark',mix(.52))};
+ window.__vrAccent(d.info.accent)})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap">
@@ -313,6 +321,123 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
   .menus,.proj,.svc{display:none}
   .quick{display:none}
 }
+/* ---------- Windows 11 (desktop app only: html.win11 is set by the desktop shell) ---------- */
+html.win11{
+  --f-ui:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --f-mono:"Cascadia Mono","Cascadia Code",Consolas,"Microsoft YaHei UI",monospace;
+  --accent:var(--sys-accent-light,#005fb8); --accent-fg:#ffffff; --accent-soft:color-mix(in srgb,var(--accent) 10%,transparent);
+  --ground:#f3f3f3; --panel:rgba(255,255,255,.72); --raised:rgba(255,255,255,.96); --line:rgba(0,0,0,.075); --line-2:rgba(0,0,0,.12);
+  --fg:rgba(0,0,0,.9); --fg-2:rgba(0,0,0,.62); --fg-3:rgba(0,0,0,.46);
+  --subtle:rgba(0,0,0,.04); --subtle-2:rgba(0,0,0,.025); --input-bottom:rgba(0,0,0,.45); --dialog:#ffffff; --dialog-foot:#f3f3f3; --flyout:rgba(252,252,252,.94); --scrim:rgba(0,0,0,.3);
+  --note:var(--accent); --note-fg:#ffffff; --note-2:color-mix(in srgb,var(--accent) 32%,#ffffff); --note-2-fg:color-mix(in srgb,var(--accent) 75%,#000000); --note-sel:#000000;
+  --play:#c42b1c; --ok:#0f7b0f; --warn:#9d5d00; --err:#c42b1c; --ok-soft:#dff6dd; --warn-soft:#fff4ce; --err-soft:#fde7e9;
+  --row-w:#ffffff; --row-b:#f6f6f6; --row-line:#efefef; --oct-line:#d4d4d4; --grid-bar:#c2c2c2; --grid-beat:#e2e2e2; --grid-sub:#f1f1f1;
+  --key-w:#ffffff; --key-b:#2b2b2b; --key-line:#e3e3e3; --hatch:rgba(0,0,0,.05); --out:rgba(0,0,0,.035);
+  --wave:var(--accent); --wave-dim:#b5b5b5; --wave-bg:#8a8a8a;
+  --shadow:0 2px 4px rgba(0,0,0,.04),0 8px 16px rgba(0,0,0,.14);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ html.win11:not([data-theme="light"]){
+  --accent:var(--sys-accent-dark,#60cdff); --accent-fg:#000000; --accent-soft:color-mix(in srgb,var(--accent) 14%,transparent);
+  --ground:#202020; --panel:rgba(255,255,255,.045); --raised:rgba(255,255,255,.065); --line:rgba(255,255,255,.075); --line-2:rgba(255,255,255,.11);
+  --fg:#ffffff; --fg-2:rgba(255,255,255,.79); --fg-3:rgba(255,255,255,.54);
+  --subtle:rgba(255,255,255,.065); --subtle-2:rgba(255,255,255,.035); --input-bottom:rgba(255,255,255,.55); --dialog:#2b2b2b; --dialog-foot:#202020; --flyout:rgba(44,44,44,.95); --scrim:rgba(0,0,0,.45);
+  --note:var(--accent); --note-fg:#000000; --note-2:color-mix(in srgb,var(--accent) 32%,#1f1f1f); --note-2-fg:#ffffff; --note-sel:#ffffff;
+  --play:#ff99a4; --ok:#6ccb5f; --warn:#fce100; --err:#ff99a4; --ok-soft:#393d1b; --warn-soft:#433519; --err-soft:#442726;
+  --row-w:#262626; --row-b:#212121; --row-line:#2c2c2c; --oct-line:#3b3b3b; --grid-bar:#4a4a4a; --grid-beat:#333333; --grid-sub:#2b2b2b;
+  --key-w:#d9d9d9; --key-b:#1c1c1c; --key-line:#a8a8a8; --hatch:rgba(255,255,255,.045); --out:rgba(0,0,0,.25);
+  --wave:var(--accent); --wave-dim:#5a5a5a; --wave-bg:#9a9a9a;
+  --shadow:0 2px 4px rgba(0,0,0,.26),0 8px 16px rgba(0,0,0,.26);
+  color-scheme:dark;
+}}
+html.win11[data-theme="dark"]{
+  --accent:var(--sys-accent-dark,#60cdff); --accent-fg:#000000; --accent-soft:color-mix(in srgb,var(--accent) 14%,transparent);
+  --ground:#202020; --panel:rgba(255,255,255,.045); --raised:rgba(255,255,255,.065); --line:rgba(255,255,255,.075); --line-2:rgba(255,255,255,.11);
+  --fg:#ffffff; --fg-2:rgba(255,255,255,.79); --fg-3:rgba(255,255,255,.54);
+  --subtle:rgba(255,255,255,.065); --subtle-2:rgba(255,255,255,.035); --input-bottom:rgba(255,255,255,.55); --dialog:#2b2b2b; --dialog-foot:#202020; --flyout:rgba(44,44,44,.95); --scrim:rgba(0,0,0,.45);
+  --note:var(--accent); --note-fg:#000000; --note-2:color-mix(in srgb,var(--accent) 32%,#1f1f1f); --note-2-fg:#ffffff; --note-sel:#ffffff;
+  --play:#ff99a4; --ok:#6ccb5f; --warn:#fce100; --err:#ff99a4; --ok-soft:#393d1b; --warn-soft:#433519; --err-soft:#442726;
+  --row-w:#262626; --row-b:#212121; --row-line:#2c2c2c; --oct-line:#3b3b3b; --grid-bar:#4a4a4a; --grid-beat:#333333; --grid-sub:#2b2b2b;
+  --key-w:#d9d9d9; --key-b:#1c1c1c; --key-line:#a8a8a8; --hatch:rgba(255,255,255,.045); --out:rgba(0,0,0,.25);
+  --wave:var(--accent); --wave-dim:#5a5a5a; --wave-bg:#9a9a9a;
+  --shadow:0 2px 4px rgba(0,0,0,.26),0 8px 16px rgba(0,0,0,.26);
+  color-scheme:dark;
+}
+html.win11.mica.mica{--ground:transparent}
+html.win11 body{-webkit-font-smoothing:auto}
+html.win11 .app{padding-top:0;gap:6px}
+html.win11 .topbar{height:44px;background:transparent;border:0;border-radius:0;padding:0 148px 0 4px;gap:6px;-webkit-app-region:drag;overflow:hidden}
+html.win11 .topbar :is(button,input,select,.transport){-webkit-app-region:no-drag}
+html.win11 .brand{gap:10px;padding:0 8px 0 6px}
+html.win11 .brand svg{width:16px;height:16px}
+html.win11 .brand b{font-weight:400;font-size:12px}
+html.win11 .brand b::after{content:" Studio"}
+html.win11 .brand small,html.win11 .svc{display:none}
+html.win11 .ckpt{max-width:160px}
+@media (max-width:1380px){html.win11 .proj{display:none}}
+html.win11 .surface{border-radius:8px;border-color:var(--line);background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+html.win11 .status{background:transparent;border:0;height:24px;padding:0 6px;font-size:12px}
+html.win11 .btn{border-radius:4px;height:32px}
+html.win11 .btn:hover{background:var(--subtle)}
+html.win11 .btn:active{background:var(--subtle-2);color:var(--fg-2)}
+html.win11 .btn.line{background:var(--raised);border:1px solid var(--line-2);box-shadow:inset 0 -1px 0 var(--line-2)}
+html.win11 .btn.line:hover{background:color-mix(in srgb,var(--raised) 85%,var(--fg) 4%);border-color:var(--line-2)}
+html.win11 .btn.primary,html.win11 .btn.on{background:var(--accent);color:var(--accent-fg);border:1px solid color-mix(in srgb,var(--accent) 85%,#ffffff);box-shadow:inset 0 -1px 0 rgba(0,0,0,.28)}
+html.win11 .btn.primary:hover,html.win11 .btn.on:hover{filter:none;background:color-mix(in srgb,var(--accent) 90%,var(--fg) 10%)}
+html.win11 .btn[disabled]{opacity:.4}
+html.win11 .seg{background:transparent;border:0;padding:0;gap:2px}
+html.win11 .seg .btn{height:32px}
+html.win11 .toolbar{gap:4px;padding:6px 8px}
+html.win11 .transport{border-radius:6px;background:var(--raised);border-color:var(--line-2);padding:2px}
+html.win11 .transport .play{background:var(--accent);color:var(--accent-fg)}
+html.win11 :is(.inp,.field-mini input,.field-mini select,.lyricbar input,.ckpt,.nv-sel,.dlg textarea){border-radius:4px;border:1px solid var(--line-2);border-bottom-color:var(--input-bottom);background:var(--raised)}
+html.win11 .proj:is(:hover,:focus){border-radius:4px;border-color:var(--line-2);border-bottom-color:var(--input-bottom);background:var(--raised)}
+html.win11 :is(.inp,.field-mini input,.lyricbar input,.dlg textarea,.proj):focus{outline:none;border-bottom-color:var(--accent);box-shadow:inset 0 -1px 0 var(--accent);background:var(--dialog)}
+html.win11 .tabs{padding:4px 8px 0;gap:2px}
+html.win11 .tab{height:34px;border:0;border-radius:4px;margin:0 0 4px;position:relative;color:var(--fg-2)}
+html.win11 .tab:hover{background:var(--subtle);color:var(--fg)}
+html.win11 .tab.on{color:var(--fg);font-weight:600;border:0}
+html.win11 .tab.on::after{content:"";position:absolute;left:50%;bottom:-4px;width:16px;height:3px;border-radius:2px;background:var(--accent);transform:translateX(-50%)}
+html.win11 .segs{border:1px solid var(--line);background:var(--subtle-2);border-radius:6px;padding:2px;gap:2px}
+html.win11 .segs button{border:0;border-radius:4px;background:transparent;height:28px;position:relative}
+html.win11 .segs button:hover{background:var(--subtle)}
+html.win11 .segs button.on{background:var(--raised);color:var(--fg);font-weight:600;box-shadow:0 0 0 1px var(--line-2)}
+html.win11 .segs button.on::after{content:"";position:absolute;left:50%;bottom:2px;width:14px;height:3px;border-radius:2px;background:var(--accent);transform:translateX(-50%)}
+html.win11 .grid12 button{border-radius:4px;background:var(--raised);border-color:var(--line-2)}
+html.win11 .grid12 button.on{background:var(--accent);color:var(--accent-fg);border-color:transparent}
+html.win11 :is(.card,.track,.pitem,.take,.chip){border-color:var(--line);background:var(--raised)}
+html.win11 :is(.card,.track,.pitem,.take){border-radius:6px}
+html.win11 .chip.on{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+html.win11 .take.act{box-shadow:none;border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+html.win11 .voice{position:relative;border-radius:6px}
+html.win11 .voice:hover{background:var(--subtle)}
+html.win11 .voice.sel{border-color:transparent;background:var(--subtle)}
+html.win11 .voice.sel::before{content:"";position:absolute;left:0;top:50%;width:3px;height:16px;margin-top:-14px;border-radius:2px;background:var(--accent)}
+html.win11 .quick{background:var(--subtle-2)}
+html.win11 .drop{border-radius:6px}
+html.win11 .menu{border-radius:8px;background:var(--flyout);border:1px solid var(--line-2);box-shadow:0 8px 16px rgba(0,0,0,.14);-webkit-backdrop-filter:blur(30px) saturate(125%);backdrop-filter:blur(30px) saturate(125%);padding:4px;min-width:250px}
+html.win11 .menu button{border-radius:4px;height:32px;padding:0 12px}
+html.win11 .menu button:hover{background:var(--subtle)}
+html.win11 .menu hr{border-top-color:var(--line);margin:4px -4px}
+html.win11 .overlay{background:var(--scrim)}
+html.win11 .dlg{border-radius:8px;background:var(--dialog);border:1px solid var(--line-2);box-shadow:0 32px 64px rgba(0,0,0,.28),0 2px 21px rgba(0,0,0,.22)}
+html.win11 .dlg header{border:0;padding:22px 24px 2px}
+html.win11 .dlg header h2{font-size:20px;font-weight:600}
+html.win11 .dlg .body{padding:12px 24px 22px}
+html.win11 .dlg footer{background:var(--dialog-foot);border-top:1px solid var(--line);padding:20px 24px;gap:8px;border-radius:0 0 8px 8px}
+html.win11 .dlg footer .btn{flex:1;min-width:0}
+html.win11 .toast{background:var(--dialog);color:var(--fg);border:1px solid var(--line-2);border-radius:8px;padding:10px 16px}
+html.win11 .toast.err{background:var(--err-soft);color:var(--fg);border-color:color-mix(in srgb,var(--err) 35%,transparent)}
+html.win11 ::-webkit-scrollbar{width:12px;height:12px}
+html.win11 ::-webkit-scrollbar-track,html.win11 ::-webkit-scrollbar-corner{background:transparent}
+html.win11 ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--fg) 38%,transparent);border:4px solid transparent;border-radius:8px;background-clip:padding-box}
+html.win11 ::-webkit-scrollbar-thumb:hover{border-width:3px}
+html.win11 input[type=range]{-webkit-appearance:none;appearance:none;height:20px;background:transparent}
+html.win11 input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(var(--accent),var(--accent)) 0 0/var(--fill,50%) 100% no-repeat,var(--input-bottom)}
+html.win11 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;margin-top:-8px;border-radius:50%;background:var(--accent);border:1px solid var(--line-2);box-shadow:inset 0 0 0 5px var(--dialog);transition:box-shadow .1s}
+html.win11 input[type=range]:hover::-webkit-slider-thumb{box-shadow:inset 0 0 0 4px var(--dialog)}
+html.win11 input[type=checkbox],html.win11 input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
+html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -366,6 +491,7 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
             <div class="vol">音量<input id="bVol" type="range" min="0" max="1" step="0.01" value="0.7"></div>
           </div>
           <input type="file" id="bkFile" accept="audio/*" hidden>
+          <input type="file" id="projFile" accept=".vrproj,.json" hidden>
         </section>
         <section class="sec">
           <div class="sec-h"><h3>参考声线</h3><span class="tag">2–8 秒清唱</span></div>
@@ -445,6 +571,8 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 <script>
 (()=>{
 'use strict';
+const DESK=window.vrDesktop||null; // set by the Windows desktop app's preload; null on the web
+let fileRef=null,savedJSON=null;   // open project file (desktop) and its last saved state
 /* ================= constants ================= */
 const NV=[ // note values the score tokenizer accepts, sorted by length (beats = quarter notes)
  {t:'NOTE_32',b:.125,l:'1/32',n:'三十二分音符'},{t:'NOTE_DOT_32',b:.1875,l:'1/32·',n:'附点三十二分'},
@@ -756,6 +884,7 @@ function renderInspector(){
  else if(S.tab==='gen')b.innerHTML=genHTML();
  else if(S.tab==='takes'){b.innerHTML=takesHTML();$$('#inspBody canvas[data-take]').forEach(c=>{const[k,id]=c.dataset.take.split('|');const t=(S.renders[k]?.takes||[]).find(x=>x.id===id);if(t)drawTakeWave(c,D.byKey[k],t,t.hash!==D.byKey[k]?.hash)})}
  else b.innerHTML=apiHTML();
+ fillRanges(b);
 }
 function propsHTML(){
  const sel=S.events.map((e,i)=>[e,i]).filter(([e])=>S.sel.has(e.id));
@@ -852,7 +981,7 @@ function renderStatus(){
   ${cp?`<span class="mono">P${cp.n}: ${cp.req.pitch.length}/${LIMIT_EVENTS} 事件 · ${cp.req.word.length}/${LIMIT_UNITS} 单元</span>`:''}
   ${S.sel.size?`<span>已选 ${S.sel.size}</span>`:''}
   <span class="spacer"></span>
-  <span>48 kHz · 单声道 · 中文</span><span>${S.service.mode==='demo'?'演示服务（模拟）':'远程：'+esc(S.service.base)}</span><span id="saveSt" style="color:var(--fg-3)">已自动保存</span>`;
+  ${DESK?`<span>桌面版 v${esc(DESK.info.version||"")}</span>`:""}<span>48 kHz · 单声道 · 中文</span><span>${S.service.mode==='demo'?'演示服务（模拟）':'远程：'+esc(S.service.base)}</span><span id="saveSt" style="color:var(--fg-3)">已自动保存</span>`;
 }
 function renderTopbar(){
  const pend=D.phrases.filter(p=>p.status==='none'||p.status==='stale').length;
@@ -867,9 +996,8 @@ function renderTopbar(){
 }
 let saveT=0;
 function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{
- const renders={};Object.entries(S.renders).forEach(([k,r])=>{if(r.takes.length)renders[k]={takes:r.takes.map(t=>({...t,buffer:undefined})),active:r.active,job:null}});
- store.set('vrstudio.project',{name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,renders});
- const s=$('#saveSt');if(s)s.textContent='已自动保存 '+new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});},400)}
+ store.set('vrstudio.project',projectData());updateTitle();
+ const s=$('#saveSt');if(s)s.textContent=(isDirty()?'有未保存的更改 · ':'')+'已自动保存 '+new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});},400)}
 function renderAll(o={}){
  derive();renderRoll();renderRuler();renderLanes();renderKeys();
  if(!o.skipInsp)renderInspector();renderStatus();renderTopbar();persist();
@@ -1049,28 +1177,30 @@ function pianoNote(c,out,t,dur,m,vel){
  g.gain.setValueAtTime(1,end);g.gain.setTargetAtTime(0,end,.07);
  return nodes;
 }
-function scheduleRange(fromBeat,onlyKey,forceTake){
- const c=ctx();const spb=60/S.bpm;const t0=c.currentTime+.08;audio.t0=t0;audio.from=fromBeat;
- const vg=c.createGain();vg.gain.value=S.mix.vMute?0:S.mix.vVol;vg.connect(audio.master);audio.nodes.push(vg);
+function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
+ const c=opt.c||ctx(),master=opt.master||audio.master,sink=opt.sink||audio.nodes,spb=60/S.bpm,t0=opt.c?opt.t0:c.currentTime+.08;
+ if(!opt.c){audio.t0=t0;audio.from=fromBeat}
+ const vg=c.createGain();vg.gain.value=opt.exp?1:(S.mix.vMute?0:S.mix.vVol);vg.connect(master);sink.push(vg);
  let endBeat=D.total;
  D.phrases.forEach(p=>{if(onlyKey&&p.key!==onlyKey)return;
-  const take=forceTake||(p.status==='done'||p.status==='stale'?activeTake(p.key):null);
-  const useVoice=take&&(forceTake||p.status==='done');
-  if(useVoice&&take.buffer){const st=t0+Math.max(0,p.start-fromBeat)*spb;const off=Math.max(0,fromBeat-p.start)*spb;if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);audio.nodes.push(s)}return}
+  if(onlyKey)endBeat=p.end;
+  const take=forceTake||(opt.exp||p.status==='done'||p.status==='stale'?activeTake(p.key):null);
+  const useVoice=take&&(forceTake||opt.exp||p.status==='done');
+  if(opt.exp&&!useVoice)return;
+  if(useVoice&&take.buffer){const st=t0+Math.max(0,p.start-fromBeat)*spb;const off=Math.max(0,fromBeat-p.start)*spb;if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);sink.push(s)}return}
   const v=voiceObj();
   if(useVoice){const perf=takePerf(take,p);const ps=p.start*spb,fsec=fromBeat*spb,vopts={vibRate:5.5,vibDepth:0,fs:v.fs||1,vol:1};
    perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+n.s,off=Math.max(0,fsec-a),dur=n.e-n.s-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
-    if(!n.k){audio.nodes.push(...breathNode(c,vg,st,dur,1));return}
+    if(!n.k){sink.push(...breathNode(c,vg,st,dur,1));return}
     const k0=Math.round((n.s+off)/perf.hop),k1=Math.max(k0+2,Math.round(n.e/perf.hop));const cur=new Float32Array(k1-k0);
     for(let k=k0;k<k1;k++){const m=perf.vals[k];cur[k-k0]=hz(m==null||isNaN(m)?n.p:m)}
-    audio.nodes.push(...vocalNote(c,vg,st,dur,hz(n.p),0,{...vopts,curve:cur,vowel:(n.w||'a').charCodeAt(0)%5,consonant:n.k!==2&&off===0}))});
+    sink.push(...vocalNote(c,vg,st,dur,hz(n.p),0,{...vopts,curve:cur,vowel:(n.w||'a').charCodeAt(0)%5,consonant:n.k!==2&&off===0}))});
   }else{
    p.idx.forEach(i=>{const e=S.events[i];if(e.kind!=='note')return;const s=D.starts[i],en=s+beats(e);if(en<=fromBeat)return;
-    const st=t0+Math.max(0,s-fromBeat)*spb,dur=(en-Math.max(s,fromBeat))*spb;audio.nodes.push(...pianoNote(c,vg,st,dur,e.pitch,.68))});
+    const st=t0+Math.max(0,s-fromBeat)*spb,dur=(en-Math.max(s,fromBeat))*spb;sink.push(...pianoNote(c,vg,st,dur,e.pitch,.68))});
   }
-  if(onlyKey)endBeat=p.end;
  });
- if(S.backing&&!onlyKey&&!forceTake){const bg=c.createGain();bg.gain.value=S.mix.bMute?0:S.mix.bVol;bg.connect(audio.master);const s=c.createBufferSource();s.buffer=S.backing.buffer;s.connect(bg);const off=fromBeat*spb;if(off<s.buffer.duration){s.start(t0,off);audio.nodes.push(s,bg)}endBeat=Math.max(endBeat,S.backing.buffer.duration/spb)}
+ if(S.backing&&!onlyKey&&!forceTake&&(!opt.exp||opt.backing)){const bg=c.createGain();bg.gain.value=opt.exp?S.mix.bVol:(S.mix.bMute?0:S.mix.bVol);bg.connect(master);const s=c.createBufferSource();s.buffer=S.backing.buffer;s.connect(bg);const off=fromBeat*spb;if(off<s.buffer.duration){s.start(t0,off);sink.push(s,bg)}endBeat=Math.max(endBeat,S.backing.buffer.duration/spb)}
  return endBeat;
 }
 function play(onlyKey,forceTake){
@@ -1134,14 +1264,14 @@ const Client={
   if(S.service.mode==='demo')return mockRender(req,onProgress,job);
   const ac=new AbortController();job.abort=()=>ac.abort();
   const base=S.service.base.replace(/\/$/,'');const H={'Content-Type':'application/json'};if(S.service.key)H.Authorization='Bearer '+S.service.key;
-  const r=await fetch(base+'/render',{method:'POST',headers:H,body:JSON.stringify(req),signal:ac.signal}).catch(()=>{throw new Error('无法连接服务，请检查服务地址')});
+  const r=await http(base+'/render',{method:'POST',headers:H,body:JSON.stringify(req),signal:ac.signal}).catch(()=>{throw new Error('无法连接服务，请检查服务地址')});
   if(!r.ok)throw new Error(await errText(r));const{job_id}=await r.json();
-  for(;;){await sleep(700);const s=await fetch(`${base}/jobs/${job_id}`,{headers:H,signal:ac.signal});if(!s.ok)throw new Error(await errText(s));const j=await s.json();
+  for(;;){await sleep(700);if(ac.signal.aborted)throw new Error('cancelled');const s=await http(`${base}/jobs/${job_id}`,{headers:H,signal:ac.signal});if(!s.ok)throw new Error(await errText(s));const j=await s.json();
    onProgress(j.progress||0);
-   if(j.status==='succeeded'){const a=await fetch(j.audio_url||`${base}/jobs/${job_id}/audio`,{headers:H,signal:ac.signal});const buf=await ctx().decodeAudioData(await a.arrayBuffer());const f0=j.f0&&Array.isArray(j.f0.hz)?{hop:+j.f0.hop_s||.01,vals:j.f0.hz.map(h=>h>0?+(69+12*Math.log2(h/440)).toFixed(2):null)}:extractF0(buf);return{buffer:buf,seed:j.seed,f0}}
+   if(j.status==='succeeded'){const a=await http(j.audio_url?new URL(j.audio_url,base+'/').toString():`${base}/jobs/${job_id}/audio`,{headers:H,signal:ac.signal});const buf=await ctx().decodeAudioData(await a.arrayBuffer());const f0=j.f0&&Array.isArray(j.f0.hz)?{hop:+j.f0.hop_s||.01,vals:j.f0.hz.map(h=>h>0?+(69+12*Math.log2(h/440)).toFixed(2):null)}:extractF0(buf);return{buffer:buf,seed:j.seed,f0}}
    if(j.status==='failed')throw new Error(j.error||'服务端渲染失败')}
  },
- async health(){if(S.service.mode==='demo')return '演示服务正常';const r=await fetch(S.service.base.replace(/\/$/,'')+'/health');if(!r.ok)throw new Error('HTTP '+r.status);return '连接成功'}
+ async health(){if(S.service.mode==='demo')return '演示服务正常';const r=await http(S.service.base.replace(/\/$/,'')+'/health');if(!r.ok)throw new Error('HTTP '+r.status);return '连接成功'}
 };
 async function errText(r){try{const j=await r.json();return j.detail||j.error||('HTTP '+r.status)}catch(e){return 'HTTP '+r.status}}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -1152,13 +1282,13 @@ function mockRender(req,onProgress,job){return new Promise((res,rej)=>{
 
 /* ================= dialogs, menus, toasts ================= */
 function toast(msg,kind){const t=document.createElement('div');t.className='toast'+(kind==='err'?' err':'');t.textContent=msg;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),kind==='err'?5200:2600)}
-function dialog(title,body,foot,mount){const o=$('#overlay');o.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><h2>${esc(title)}</h2><button class="btn icon" data-close title="关闭">${icon('x')}</button></header><div class="body">${body}</div>${foot?`<footer>${foot}</footer>`:''}</div>`;o.hidden=false;mount&&mount(o);const f=o.querySelector('input,textarea,select,button.primary');f&&f.focus()}
+function dialog(title,body,foot,mount,dopt={}){const o=$('#overlay');o.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-label="${esc(title)}"${dopt.modal?' data-modal="1"':''}><header><h2>${esc(title)}</h2>${dopt.modal?'':`<button class="btn icon" data-close title="关闭">${icon('x')}</button>`}</header><div class="body">${body}</div>${foot?`<footer>${foot}</footer>`:''}</div>`;o.hidden=false;mount&&mount(o);const f=o.querySelector('input,textarea,select,button.primary');f&&f.focus()}
 function closeDialog(){$('#overlay').hidden=true;$('#overlay').innerHTML=''}
-$('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay'||e.target.closest('[data-close]'))closeDialog()});
+$('#overlay').addEventListener('click',e=>{if(e.target.closest('[data-close]')||(e.target.id==='overlay'&&!$('#overlay [data-modal]')))closeDialog()});
 const MENUS={
- file:[['新建空白工程','',()=>confirmDlg('新建空白工程','当前乐谱和渲染版本会被清空。确定继续吗？','新建',()=>{commit(()=>{S.events=[];S.sel.clear()});S.renders={};S.name='未命名工程';$('#projName').value=S.name;renderAll()})],
+ file:[['新建空白工程',DESK?'Ctrl+N':'',()=>newProject()],['打开工程文件…','Ctrl+O',()=>openProject()],...(DESK?[['保存','Ctrl+S',()=>saveProject(false)],['另存为…','Ctrl+Shift+S',()=>saveProject(true)]]:[]),0,
   ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};renderAll();toast('已载入示例')}],0,
-  ['导入乐谱…','Ctrl+O',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],0,['复制当前乐句的接口请求','',()=>copyApi()]],
+  ['导入乐谱…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
  edit:[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',()=>{S.sel=new Set(S.events.map(e=>e.id));renderAll()}],['删除选中','Delete',delSel],0,['渲染所有未渲染乐句','Ctrl+R',renderPending]],
  help:[['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
 let openMenu=null;
@@ -1172,7 +1302,7 @@ document.addEventListener('click',e=>{const mb=e.target.closest('[data-menu]');
 function confirmDlg(t,msg,ok,fn){dialog(t,`<p style="margin:0;line-height:1.6">${esc(msg)}</p>`,`<button class="btn line" data-close>取消</button><button class="btn primary" id="cfOk">${esc(ok)}</button>`,o=>o.querySelector('#cfOk').onclick=()=>{closeDialog();fn()})}
 function kbDlg(){const K=[['播放 / 暂停','Space'],['停止并回到开头','Esc'],['回到开头 / 结尾','Home / End'],['选择 / 铅笔 / 橡皮','V / B / E'],['选中前一个 / 后一个','← / →'],['音高 ±1 半音','↑ / ↓'],['音高 ±1 八度','Shift + ↑ / ↓'],['缩短 / 延长时值','[ / ]'],['编辑歌词（Tab 跳到下一个）','Enter / 双击'],['插入音符 / 休止 / 连音','N / R / M'],['删除','Delete'],['撤销 / 重做','Ctrl+Z / Ctrl+Shift+Z'],['全选','Ctrl+A'],['渲染未渲染乐句','Ctrl+R'],['横向缩放 / 纵向缩放','Ctrl+滚轮 / Alt+滚轮'],['自由定位播放头','按住 Alt 点标尺']];
  dialog('快捷键',`<div class="kb-grid">${K.map(([a,b])=>`<span>${a}</span><kbd>${b}</kbd>`).join('')}</div>`)}
-function aboutDlg(){dialog('关于 VocalRender',`<div style="line-height:1.75;font-size:13px">
+function aboutDlg(){dialog('关于 VocalRender',`<div style="line-height:1.75;font-size:13px">${DESK?`<p style="margin-top:0"><b>VocalRender Studio 桌面版 v${esc(DESK.info.version||'')}</b></p>`:''}
  <p style="margin-top:0">VocalRender 是乐谱原生（score-native）的歌声合成模型：直接读取歌词、MIDI 音高、音符时值和全局速度，生成 48 kHz 歌声，不需要逐音素时长或对齐好的参考音频。</p>
  <p>每次渲染需要一段 2–8 秒的干净清唱作为参考，它决定音色。<b>VocalRender-Pro</b> 用更多真实歌唱数据训练，默认使用；<b>VocalRender</b> 是基础版本，两者结构相同。</p>
  <p>当前发布的模型只支持中文歌词，单次请求最多 64 个字/休止单元、128 个音符/休止事件；本编辑器按休止自动分句，逐句提交。</p>
@@ -1181,7 +1311,7 @@ function settingsDlg(){const s=S.service;
  dialog('服务设置',`<div class="fld"><div class="lab">渲染服务</div><div class="segs"><button data-sm="demo" class="${s.mode==='demo'?'on':''}">演示（模拟渲染）</button><button data-sm="remote" class="${s.mode==='remote'?'on':''}">连接 VocalRender 服务</button></div></div>
  <div class="fld"><label for="sBase">服务地址</label><input class="inp mono" id="sBase" value="${esc(s.base)}" placeholder="https://your-gpu-server/v1"></div>
  <div class="fld"><label for="sKey">访问 Token（可选）</label><input class="inp mono" id="sKey" type="password" value="${esc(s.key)}" autocomplete="off"><p class="hint">只保存在当前页面内存中，刷新后需重新填写。</p></div>
- <div class="card hint">远程模式按“接口”面板里的端点调用：POST /render 提交、GET /jobs/{id} 轮询、取回 48 kHz WAV。服务端可基于官方 <span class="mono">demo/app.py</span> 封装。</div>`,
+ <div class="card hint">远程模式按“接口”面板里的端点调用：POST /render 提交、GET /jobs/{id} 轮询、取回 48 kHz WAV。服务端可基于官方 <span class="mono">demo/app.py</span> 封装。<br>${DESK?'桌面版由系统网络直接连接服务，不受浏览器跨域限制。':'网页版直接从浏览器请求，服务端需要允许跨域（CORS）。'}</div>`,
  `<button class="btn line" id="sTest">测试连接</button><button class="btn primary" id="sSave">保存</button>`,o=>{
   let mode=s.mode;o.querySelectorAll('[data-sm]').forEach(b=>b.onclick=()=>{mode=b.dataset.sm;o.querySelectorAll('[data-sm]').forEach(x=>x.classList.toggle('on',x===b))});
   const apply=()=>{s.mode=mode;s.base=o.querySelector('#sBase').value.trim();s.key=o.querySelector('#sKey').value};
@@ -1208,14 +1338,23 @@ function fromLabel(d){
   if(w==='SP')return{id:uid(),kind:'rest',word:'SP',pitch:0,dur:idx[t]};if(w==='AP')return{id:uid(),kind:'breath',word:'AP',pitch:0,dur:idx[t]};
   return{id:uid(),kind:'note',word:mel?'-':w,pitch:+p,dur:idx[t]}});
 }
-function exportDlg(){const done=D.phrases.filter(p=>p.status==='done').length,all=D.phrases.length;
- dialog('导出音频',`<div class="fld"><div class="lab">范围</div><div class="segs"><button class="on" data-x="all">整首</button><button data-x="sel">当前乐句</button></div></div>
- <div class="fld"><div class="lab">格式</div><div class="segs"><button class="on">WAV 48 kHz / 24-bit</button><button>WAV 48 kHz / 16-bit</button><button>FLAC</button></div></div>
- <div class="fld"><div class="lab">内容</div><label class="row" style="gap:8px;font-size:12.5px"><input type="checkbox" checked> 只导出人声（不含伴奏）</label><label class="row" style="gap:8px;font-size:12.5px"><input type="checkbox" checked> 乐句之间按乐谱位置补齐静音</label></div>
- <div class="card hint">${done}/${all} 个乐句已渲染为最新版本。${done<all?'未渲染或已修改的乐句会先自动渲染。':''}${S.service.mode==='demo'?'<br>当前为演示服务，不会生成真实音频文件；连接 VocalRender 服务后由 <span class="mono">/jobs/{id}/audio</span> 提供下载。':''}</div>`,
- `<button class="btn line" data-close>取消</button><button class="btn primary" id="expGo">导出</button>`,o=>{
-  o.querySelectorAll('.segs').forEach(sg=>sg.querySelectorAll('button').forEach(b=>b.onclick=()=>sg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))));
-  o.querySelector('#expGo').onclick=()=>{closeDialog();if(done<all)renderPending();toast(S.service.mode==='demo'?'演示服务不生成文件；接口请求已按导出设置准备好':'导出任务已提交')}})}
+function exportDlg(){
+ const st=D.phrases.map(p=>p.status),all=st.length,done=st.filter(s=>s==='done').length,stale=st.filter(s=>s==='stale').length,none=all-done-stale;const cp=curPhrase();
+ const opt={range:'all',bits:'24',key:cp?cp.key:null};
+ dialog('导出音频',`<div class="fld"><div class="lab">范围</div><div class="segs" data-opt="range"><button class="on" data-v="all">整首</button><button data-v="phrase" ${cp?'':'disabled'}>当前乐句${cp?' P'+cp.n:''}</button></div></div>
+ <div class="fld"><div class="lab">格式</div><div class="segs" data-opt="bits"><button class="on" data-v="24">WAV · 48 kHz · 24-bit</button><button data-v="16">WAV · 48 kHz · 16-bit</button></div></div>
+ <div class="fld"><label class="row" style="gap:8px;font-size:12.5px"><input type="checkbox" id="expBk" ${S.backing?'':'disabled'}> 混入伴奏${S.backing?'':'（还没有导入伴奏）'}</label></div>
+ <div class="card hint">${done}/${all} 个乐句是最新渲染。${stale?stale+' 个乐句改动后还没重新渲染，会按旧版本导出。':''}${none?none+' 个乐句未渲染，导出为静音，建议先渲染。':''}${DESK?'':'<br>网页版不能写入本地文件，请使用桌面版导出 WAV。'}</div>`,
+ `${none||stale?'<button class="btn line" id="expRender">先渲染</button>':''}<button class="btn line" data-close>取消</button><button class="btn primary" id="expGo" ${DESK?'':'disabled'}>导出</button>`,o=>{
+  o.querySelectorAll('[data-opt]').forEach(sg=>sg.querySelectorAll('button').forEach(b=>b.onclick=()=>{if(b.disabled)return;opt[sg.dataset.opt]=b.dataset.v;sg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))}));
+  const rb=o.querySelector('#expRender');if(rb)rb.onclick=()=>{closeDialog();renderPending()};
+  o.querySelector('#expGo').onclick=async()=>{const go=o.querySelector('#expGo');go.disabled=true;go.textContent='正在导出…';
+   try{const buf=await renderMix({...opt,backing:o.querySelector('#expBk').checked});const wav=encodeWav(buf,+opt.bits);
+    const base=(fileRef?fileRef.name.replace(/\.vrproj$/i,''):S.name)+(opt.range==='phrase'&&cp?'_P'+cp.n:'');
+    const r=await DESK.saveFile({kind:'wav',data:wav,defaultName:base+'.wav'});closeDialog();if(r)toast(`已导出 ${r.name} · ${buf.duration.toFixed(1)} 秒`)}
+   catch(e){go.disabled=false;go.textContent='导出';toast('导出失败：'+e.message,'err')}};
+ });
+}
 function copyApi(){const p=D.byKey[S.apiPhrase]||curPhrase();if(!p)return toast('没有可复制的乐句');const txt=JSON.stringify(renderRequest(p),null,2);
  const ok=()=>toast(`已复制乐句 ${p.n} 的请求 JSON`);
  if(navigator.clipboard)navigator.clipboard.writeText(txt).then(ok,()=>fallbackSel());else fallbackSel();
@@ -1240,6 +1379,88 @@ $('#bkFile').addEventListener('change',async e=>{const f=e.target.files[0];e.tar
 $('#lanes').addEventListener('dragover',e=>e.preventDefault());
 $('#lanes').addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)loadBacking(f)});
 async function loadBacking(f){try{const b=await decodeFile(f);S.backing={name:f.name,buffer:b};$('#trkBk').textContent=f.name+' · '+fmtTime(b.duration).slice(0,5);renderAll();toast('伴奏已导入，与人声同步播放')}catch(e){toast('无法读取伴奏音频','err')}}
+
+
+/* ================= desktop integration (Windows app) ================= */
+function b64ToBytes(b){const s=atob(b||''),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u}
+// Service requests: the desktop app sends them from the main process (no browser CORS rules); the web page uses fetch
+function http(url,init={}){
+ if(!DESK||!DESK.request)return fetch(url,init);
+ return DESK.request({url:String(url),method:init.method||'GET',headers:init.headers||{},body:typeof init.body==='string'?init.body:null})
+  .then(r=>new Response([101,204,205,304].includes(r.status)?null:b64ToBytes(r.body),{status:r.status,statusText:r.statusText||'',headers:r.headers||{}}));
+}
+function projectData(){const renders={};Object.entries(S.renders).forEach(([k,r])=>{if(r.takes.length)renders[k]={takes:r.takes.map(t=>({...t,buffer:undefined})),active:r.active,job:null}});
+ return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,renders}}
+const projectJSON=()=>JSON.stringify(projectData());
+const isDirty=()=>!!fileRef&&savedJSON!==projectJSON();
+function updateTitle(){if(!DESK)return;document.title=(isDirty()?'● ':'')+(fileRef?fileRef.name.replace(/\.vrproj$/i,''):S.name)+' - VocalRender Studio'}
+function loadProject(o,ref){
+ if(!o||(o.format&&o.format!=='vocalrender-studio-project')||!Array.isArray(o.events))throw new Error('不是 VocalRender Studio 工程文件');
+ if(audio.playing)pause();queue.length=0;
+ Object.assign(S,{name:o.name||'未命名工程',bpm:+o.bpm||90,bpb:+o.bpb||4,events:o.events.map(e=>({...e,id:e.id||uid()})),voice:[...VOICES,...S.customVoices].some(v=>v.id===o.voice)?o.voice:'Alto-1',ckpt:o.ckpt||'VocalRender-Pro',renders:o.renders||{}});
+ Object.values(S.renders).forEach(r=>r.job=null);if(o.gen)Object.assign(S.gen,o.gen);
+ S.sel.clear();S.curPhrase=null;S.playhead=0;hist=[];redo=[];perfCache.clear();
+ $('#bpm').value=S.bpm;$('#bpb').value=S.bpb;$('#ckpt').value=S.ckpt;$('#projName').value=S.name;
+ fileRef=ref||null;renderVoices();renderAll();savedJSON=fileRef?projectJSON():null;updateTitle();
+}
+async function saveProject(as){
+ if(!DESK){toast('网页版会自动保存在本机浏览器里；要保存成工程文件请使用桌面版');return false}
+ try{const r=await DESK.saveFile({kind:'project',data:JSON.stringify(projectData(),null,1),path:as?null:(fileRef&&fileRef.path),defaultName:fileRef?fileRef.name:S.name+'.vrproj'});
+  if(!r)return false;fileRef={path:r.path,name:r.name};savedJSON=projectJSON();updateTitle();toast('已保存 '+r.name);return true}
+ catch(e){toast('保存失败：'+e.message,'err');return false}
+}
+async function openProject(){
+ if(!DESK){$('#projFile').click();return}
+ try{const r=await DESK.openFile();if(!r)return;loadProject(JSON.parse(r.text),{path:r.path,name:r.name});toast('已打开 '+r.name)}
+ catch(e){toast('无法打开：'+e.message,'err')}
+}
+function newProject(){confirmDlg('新建空白工程','当前乐谱和渲染版本会被清空。确定继续吗？','新建',()=>{loadProject({events:[],name:'未命名工程',bpm:S.bpm,bpb:S.bpb,voice:S.voice,ckpt:S.ckpt},null)})}
+$('#projFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{loadProject(JSON.parse(await f.text()),null);toast('已打开 '+f.name)}catch(err){toast('无法打开：'+err.message,'err')}});
+document.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault()});
+document.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files[0];if(!f||e.defaultPrevented)return;e.preventDefault();
+ if(/\.(vrproj|json)$/i.test(f.name)){f.text().then(t=>{const p=DESK&&DESK.pathForFile?DESK.pathForFile(f):null;loadProject(JSON.parse(t),p?{path:p,name:f.name}:null);toast('已打开 '+f.name)}).catch(err=>toast('无法打开：'+err.message,'err'))}
+ else toast('拖入 .vrproj 打开工程；参考音频拖到左侧声线区，伴奏拖到伴奏轨')});
+// File shortcuts work even while typing in a field, like other Windows editors
+document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||e.altKey||!$('#overlay').hidden)return;const k=e.key.toLowerCase();
+ if(k==='s'){e.preventDefault();e.stopPropagation();saveProject(e.shiftKey)}
+ else if(k==='o'){e.preventDefault();e.stopPropagation();openProject()}
+ else if(k==='n'&&DESK){e.preventDefault();e.stopPropagation();newProject()}},true);
+function fillRanges(root=document){root.querySelectorAll('input[type=range]').forEach(r=>r.style.setProperty('--fill',((r.value-r.min)/(r.max-r.min)*100)+'%'))}
+document.addEventListener('input',e=>{if(e.target.type==='range')fillRanges(e.target.parentNode)});
+if(DESK){
+ if(DESK.onCloseRequest)DESK.onCloseRequest(()=>new Promise(res=>{
+  if(!isDirty())return res(true);
+  dialog('VocalRender Studio',`<p style="margin:0;line-height:1.6">是否保存对“${esc(fileRef.name)}”的更改？</p>`,`<button class="btn primary" id="cSave">保存</button><button class="btn line" id="cNo">不保存</button><button class="btn line" id="cCancel">取消</button>`,o=>{
+   o.querySelector('#cSave').onclick=async()=>{closeDialog();res(await saveProject(false))};
+   o.querySelector('#cNo').onclick=()=>{closeDialog();res(true)};
+   o.querySelector('#cCancel').onclick=()=>{closeDialog();res(false)}},{modal:true});
+ }));
+ if(DESK.onOpenFile)DESK.onOpenFile(r=>{try{loadProject(JSON.parse(r.text),{path:r.path,name:r.name});toast('已打开 '+r.name)}catch(e){toast('无法打开 '+r.name+'：'+e.message,'err')}});
+ if(DESK.onAccentChange)DESK.onAccentChange(h=>{window.__vrAccent&&window.__vrAccent(h);perfCache.clear();renderAll();renderVoices()});
+ updateTitle();
+}
+// Offline mix of the active takes (unrendered phrases are silent), for WAV export
+async function renderMix(o){
+ ctx();const sr=48000,spb=60/S.bpm;let from=0,end=D.total,key=null;
+ if(o.range==='phrase'){const p=D.byKey[o.key];if(!p)throw new Error('找不到当前乐句');key=p.key;from=p.start;end=p.end}
+ if(end<=from)throw new Error('没有可导出的内容');
+ let sec=(end-from)*spb+1.6;if(o.backing&&S.backing&&!key)sec=Math.max(sec,S.backing.buffer.duration+.3);
+ const oc=new OfflineAudioContext(2,Math.ceil(sec*sr),sr);
+ const comp=oc.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(oc.destination);const bus=oc.createGain();bus.connect(comp);
+ const conv=oc.createConvolver();conv.buffer=roomIR(oc);const wet=oc.createGain();wet.gain.value=.16;bus.connect(conv);conv.connect(wet);wet.connect(comp);
+ scheduleRange(from,key,null,{c:oc,master:bus,sink:[],t0:.05,exp:true,backing:!!o.backing});
+ return await oc.startRendering();
+}
+function encodeWav(buf,bits){
+ const ch=buf.numberOfChannels,sr=buf.sampleRate,n=buf.length,bps=bits/8,size=n*ch*bps,ab=new ArrayBuffer(44+size),v=new DataView(ab);
+ const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+ w(0,'RIFF');v.setUint32(4,36+size,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,ch,true);v.setUint32(24,sr,true);v.setUint32(28,sr*ch*bps,true);v.setUint16(32,ch*bps,true);v.setUint16(34,bits,true);w(36,'data');v.setUint32(40,size,true);
+ const chans=[...Array(ch)].map((_,c)=>buf.getChannelData(c));let peak=0;chans.forEach(d=>{for(let i=0;i<n;i++){const a=Math.abs(d[i]);if(a>peak)peak=a}});
+ const g=peak>.98?.98/peak:1,max=bits===16?32767:8388607;let o=44;
+ for(let i=0;i<n;i++)for(let c=0;c<ch;c++){const q=Math.round(Math.max(-1,Math.min(1,chans[c][i]*g))*max);
+  if(bits===16){v.setInt16(o,q,true);o+=2}else{v.setUint8(o,q&255);v.setUint8(o+1,(q>>8)&255);v.setUint8(o+2,(q>>16)&255);o+=3}}
+ return new Uint8Array(ab);
+}
 
 /* ================= wiring ================= */
 function setTool(t){S.tool=t;$$('[data-tool]').forEach(b=>b.classList.toggle('on',b.dataset.tool===t));content.style.cursor=t==='pencil'?'crosshair':t==='eraser'?'cell':'default'}
@@ -1316,14 +1537,14 @@ $('#status').addEventListener('click',e=>{if(!e.target.closest('#stIssues'))retu
   o.querySelectorAll('[data-iss]').forEach(b=>b.onclick=()=>{const x=D.issues[+b.dataset.iss];closeDialog();if(x.i!=null){S.sel=new Set([S.events[x.i].id]);S.tab='props';renderAll();scrollToIdx(x.i)}else if(x.key)selectPhrase(x.key,false)})})});
 
 document.addEventListener('keydown',e=>{
- if(!$('#overlay').hidden){if(e.key==='Escape')closeDialog();return}
+ if(!$('#overlay').hidden){if(e.key==='Escape'&&!$('#overlay [data-modal]'))closeDialog();return}
  const tag=(e.target.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select'||e.target.isContentEditable)return;
  const mod=e.ctrlKey||e.metaKey;const k=e.key;
  if(mod&&k.toLowerCase()==='z'){e.preventDefault();e.shiftKey?doRedo():undo();return}
  if(mod&&k.toLowerCase()==='y'){e.preventDefault();doRedo();return}
  if(mod&&k.toLowerCase()==='a'){e.preventDefault();S.sel=new Set(S.events.map(x=>x.id));renderAll();return}
  if(mod&&k.toLowerCase()==='r'){e.preventDefault();renderPending();return}
- if(mod&&k.toLowerCase()==='o'){e.preventDefault();importDlg();return}
+ if(mod&&k.toLowerCase()==='i'){e.preventDefault();importDlg();return}
  if(mod&&k.toLowerCase()==='e'){e.preventDefault();exportDlg();return}
  if(mod)return;
  switch(k){

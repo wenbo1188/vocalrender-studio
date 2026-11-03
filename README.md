@@ -1,38 +1,41 @@
 # VocalRender Studio
 
-A web editor for [VocalRender](https://github.com/pymaster17/VocalRender), a score-native singing voice synthesis model. It follows the track + piano-roll workflow of mainstream vocal synthesis tools. The editing model and the request format match VocalRender's real inputs.
+为 [VocalRender](https://github.com/pymaster17/VocalRender)（乐谱原生的歌声合成模型）设计的创作界面，沿用主流歌声合成软件的“轨道 + 钢琴卷帘”工作流，编辑逻辑和请求格式与 VocalRender 的真实输入一致。
 
-It's a single static page (`index.html`) with no build step. Open it directly in a browser.
+提供两个版本，功能相同：
 
-## Features
+- **网页版**：根目录的 `index.html`，单文件、无需构建，用浏览器直接打开。
+- **Windows 桌面版**：`desktop/` 目录，Electron 打包，Windows 11 外观，另有工程文件、WAV 导出、双击打开 `.vrproj` 等桌面功能。仓库只包含源码，生成 exe 的方法见 [desktop/README.md](desktop/README.md)。
 
-- **Piano roll**: drag a note vertically to change its pitch; drag the right edge to change its length (snaps to the 12 note values the model supports, and later notes shift automatically); double-click to enter lyrics (Tab jumps to the next note).
-- **Lyric conventions**: one Chinese character per note; `-` continues the previous character (melisma); `SP` is a rest; `AP` is a breath.
-- **Batch lyrics**: enter a line of lyrics and fill it into notes in order. On an empty roll, quarter notes are generated automatically.
-- **Reference voices**: 6 GTSinger reference clips built in (Alto-1/2/3, Tenor-1/2/3). Custom 2–8 second uploads require confirming usage rights. Each voice's suggested range is marked on the keyboard and in the grid.
-- **Phrase-by-phrase rendering**: the score is split into phrases at rests and each phrase is submitted separately (single-request limits: 64 lyric/rest units, 128 events). Status runs not rendered → queued → rendering → rendered / modified.
-- **Takes**: generate multiple takes of the same phrase and pick one to compare. Changing the score, voice, model or generation parameters marks affected phrases for re-rendering.
-- **Generation parameters**: `cfg_value`, `inference_timesteps`, `temperature`, `fsq_temperature`, `prompt_max_frames`, `max_len`, `lyrics_only`, and seed. Includes stable / balanced / vivid presets.
-- **Validation**: non-Chinese lyrics, a melisma with no preceding character, over-limit phrases, and out-of-range notes are flagged in real time, with jump-to-location.
-- **Pitch curves**: after a phrase renders, the take's actual pitch (F0) curve is drawn over the notes, showing glides, vibrato and note-end falls. If the score changes afterwards the curve turns dashed for comparison. Uses `f0` from the job response when present; otherwise the frontend extracts it from the result audio with YIN.
-- **Piano preview**: clicking or dragging notes, and playing unrendered phrases, uses a synthesized piano with light room reverb.
-- **Other**: backing track import with synced playback, VocalRender label JSON import, undo/redo, keyboard shortcuts (press `?`), and autosave to browser local storage.
+## 功能
 
-## Service API
+- **钢琴卷帘**：上下拖动音符改音高，拖右边缘改时值（吸附模型支持的 12 种音符，后续音符自动顺延），双击填词，Tab 跳到下一个音符。
+- **歌词约定**：每个音符一个汉字；`-` 表示延续上一个字（一字多音）；`SP` 休止；`AP` 换气。
+- **批量歌词**：输入一句歌词按顺序填入音符；空卷帘会自动生成四分音符。
+- **参考声线**：内置 GTSinger 的 6 段参考（Alto-1/2/3、Tenor-1/2/3），也可上传 2–8 秒清唱（需确认使用授权）。键盘和网格上标出所选声线的建议音域。
+- **按乐句渲染**：在休止处自动分句、逐句提交（单次上限 64 个字/休止单元、128 个事件）。状态依次为未渲染 → 排队中 → 渲染中 → 已渲染 / 已修改。
+- **多版本**：同一乐句可生成多个版本对比挑选；改乐谱、声线、模型或生成参数后，受影响的乐句标为需重新渲染。
+- **音高线**：渲染完成后在卷帘上画出该版本的实际音高（F0）曲线，可看到滑音、颤音和尾音下滑；乐谱改动后曲线变虚线便于对照。服务返回 `f0` 时直接使用，否则前端用 YIN 算法从结果音频提取。
+- **钢琴预听**：点击、拖动音符和播放未渲染乐句时使用合成钢琴音。
+- **生成参数**：`cfg_value`、`inference_timesteps`、`temperature`、`fsq_temperature`、`prompt_max_frames`、`max_len`、`lyrics_only`、随机种子，附“稳定 / 均衡 / 生动”预设。
+- **校验**：实时标出非中文歌词、连音前无字、超出单次上限、超出音域等问题，可一键跳转。
+- **其他**：伴奏导入同步播放、导入 VocalRender 标注 JSON、打开 `.vrproj` 工程、撤销/重做、快捷键（按 `?` 查看）、自动保存。
 
-By default the page runs in **demo mode** (rendering is simulated locally, and playback uses a formant synth as a stand-in for the voice). Switch to remote mode in Settings and enter a service URL, and the page calls the endpoints below:
+## 服务接口
 
-| Method | Path | Description |
+默认是**演示模式**：渲染在本地模拟，人声用共振峰合成器近似。在设置里切到“连接 VocalRender 服务”并填写服务地址后，会调用以下端点：
+
+| 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/voices` | Built-in reference voices |
-| POST | `/voices` | Upload reference audio (multipart), returns `upload_id` |
-| POST | `/render` | Submit a phrase for rendering, returns `job_id` |
-| GET | `/jobs/{job_id}` | `status`: queued / running / succeeded / failed, `progress` 0–1, `audio_url`; optional `f0: {hop_s, hz[]}` (0 = unvoiced) |
+| GET | `/health` | 连接测试 |
+| GET | `/voices` | 内置参考声线 |
+| POST | `/voices` | 上传参考音频（multipart），返回 `upload_id` |
+| POST | `/render` | 提交一个乐句，返回 `job_id` |
+| GET | `/jobs/{job_id}` | `status`：queued / running / succeeded / failed；`progress` 0–1；`audio_url`；可选 `f0: {hop_s, hz[]}`（无声帧为 0） |
 | GET | `/jobs/{job_id}/audio` | 48 kHz WAV |
-| POST | `/score/import` | Parse ABC / MusicXML into word·pitch·note·pitch2word |
-| GET | `/health` | Connection test |
+| POST | `/score/import` | 把 ABC / MusicXML 解析成 word·pitch·note·pitch2word |
 
-`POST /render` request body (the `score` field matches VocalRender's label JSON):
+`POST /render` 请求体（`score` 字段与 VocalRender 标注 JSON 一致）：
 
 ```json
 {
@@ -55,4 +58,24 @@ By default the page runs in **demo mode** (rendering is simulated locally, and p
 }
 ```
 
-The server side can wrap the official repo's `demo/app.py` or `scripts/infer_vocalrender_svs_single.py`; the generation parameter names match that script's command-line arguments.
+服务端可基于官方仓库的 `demo/app.py` 或 `scripts/infer_vocalrender_svs_single.py` 封装，生成参数名与该脚本的命令行参数一致。网页版直接从浏览器请求，服务端需要允许跨域（CORS）；桌面版由主进程发请求，没有这个限制。
+
+### 用模拟服务试用远程模式
+
+`tools/mock_vocalrender_server.py` 实现了上面的接口，返回跟随乐谱的简单合成音（不是真实歌声），只需 Python 3，不需要 GPU：
+
+```bash
+python tools/mock_vocalrender_server.py          # http://127.0.0.1:8000/v1
+python tools/mock_vocalrender_server.py --no-f0  # 不返回 f0，由前端自己提取音高线
+```
+
+然后在编辑器的设置里把服务地址填为 `http://127.0.0.1:8000/v1`。
+
+## 目录结构
+
+```
+index.html                      网页版（也是桌面版的界面来源）
+desktop/                        Windows 桌面版（Electron），构建说明见 desktop/README.md
+tools/mock_vocalrender_server.py  模拟渲染服务
+.github/workflows/build-windows.yml  在 GitHub Actions 上构建 exe
+```
