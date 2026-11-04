@@ -521,7 +521,7 @@ html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
             <div class="vol">音量<input id="bVol" type="range" min="0" max="1" step="0.01" value="0.7"></div>
           </div>
           <input type="file" id="bkFile" accept="audio/*" hidden>
-          <input type="file" id="projFile" accept=".vrproj,.json,.txt" hidden>
+          <input type="file" id="projFile" accept=".vrproj,.json,.txt,.mid,.midi,.kar" hidden>
         </section>
         <section class="sec">
           <div class="sec-h"><h3>参考声线</h3><span class="tag">2–8 秒清唱</span></div>
@@ -1297,7 +1297,7 @@ $('#lyricFill').addEventListener('click',()=>{
 });
 
 /* ================= audio ================= */
-const audio={ctx:null,nodes:[],playing:false,t0:0,from:0,raf:0,noise:null,master:null};
+const audio={ctx:null,nodes:[],jobs:[],ji:0,timer:0,playing:false,t0:0,from:0,raf:0,noise:null,master:null};
 function ctx(){if(!audio.ctx){audio.ctx=new(window.AudioContext||window.webkitAudioContext)();const comp=audio.ctx.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(audio.ctx.destination);const bus=audio.ctx.createGain();bus.connect(comp);const conv=audio.ctx.createConvolver();conv.buffer=roomIR(audio.ctx);const wet=audio.ctx.createGain();wet.gain.value=.16;bus.connect(conv);conv.connect(wet);wet.connect(comp);audio.master=bus;
  const nb=audio.ctx.createBuffer(1,audio.ctx.sampleRate,audio.ctx.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;audio.noise=nb}
  if(audio.ctx.state==='suspended')audio.ctx.resume();return audio.ctx}
@@ -1313,11 +1313,11 @@ function vocalNote(c,out,t,dur,f,fPrev,o){
  const g=c.createGain();const amp=.9*o.vol;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(amp,t+(fPrev?.02:.05));g.gain.setValueAtTime(amp,Math.max(t+.05,t+dur-.06));g.gain.linearRampToValueAtTime(0,t+dur+.05);
  VOW[o.vowel].forEach((fr,k)=>{const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=fr*o.fs;bp.Q.value=[7,9,11][k];const gg=c.createGain();gg.gain.value=[1.6,.8,.45][k];osc.connect(bp);bp.connect(gg);gg.connect(g)});
  const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=900;const lpg=c.createGain();lpg.gain.value=.12;osc.connect(lp);lp.connect(lpg);lpg.connect(g);
- g.connect(out);osc.start(t);lfo.start(t);osc.stop(t+dur+.1);lfo.stop(t+dur+.1);nodes.push(osc,lfo);
+ g.connect(out);osc.start(t);lfo.start(t);osc.stop(t+dur+.1);lfo.stop(t+dur+.1);nodes.push(osc,lfo);osc.onended=()=>{try{g.disconnect()}catch(e){}};
  if(!fPrev&&o.consonant){const n=c.createBufferSource();n.buffer=audio.noise;const hp=c.createBiquadFilter();hp.type='bandpass';hp.frequency.value=4200;hp.Q.value=.8;const ng=c.createGain();ng.gain.setValueAtTime(.22*o.vol,t-.015);ng.gain.exponentialRampToValueAtTime(.001,t+.05);n.connect(hp);hp.connect(ng);ng.connect(out);n.start(Math.max(c.currentTime,t-.015));n.stop(t+.06);nodes.push(n)}
  return nodes;
 }
-function breathNode(c,out,t,dur,vol){const n=c.createBufferSource();n.buffer=audio.noise;n.loop=true;const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1500;bp.Q.value=.7;const g=c.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.09*vol,t+dur*.4);g.gain.linearRampToValueAtTime(0,t+dur*.9);n.connect(bp);bp.connect(g);g.connect(out);n.start(t);n.stop(t+dur);return[n]}
+function breathNode(c,out,t,dur,vol){const n=c.createBufferSource();n.buffer=audio.noise;n.loop=true;const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1500;bp.Q.value=.7;const g=c.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.09*vol,t+dur*.4);g.gain.linearRampToValueAtTime(0,t+dur*.9);n.connect(bp);bp.connect(g);g.connect(out);n.start(t);n.stop(t+dur);n.onended=()=>{try{g.disconnect()}catch(e){}};return[n]}
 function roomIR(c){const len=Math.floor(c.sampleRate*1.6),b=c.createBuffer(2,len,c.sampleRate);for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);for(let i=0;i<len;i++){const t=i/len;d[i]=(Math.random()*2-1)*Math.pow(1-t,3.2)*(i<c.sampleRate*.012?i/(c.sampleRate*.012):1)}}return b}
 // Additive piano: inharmonic partials with per-partial decay, two detuned strings on the low partials, hammer noise, brightness falling over time, damper at note-off
 function pianoNote(c,out,t,dur,m,vel){
@@ -1327,13 +1327,13 @@ function pianoNote(c,out,t,dur,m,vel){
  lp.frequency.setValueAtTime(Math.min(12000,f*12+1500)*(.55+.6*vel),t);lp.frequency.exponentialRampToValueAtTime(Math.max(f*2.5,500),t+1.8);
  lp.connect(g);g.connect(out);
  const sustain=Math.max(.9,7.5*Math.pow(2,-(m-48)/13));
- const N=Math.max(3,Math.min(12,Math.floor(10000/f))),B=.00025;
+ const N=Math.max(3,Math.min(10,Math.floor(9000/f))),B=.00025;
  for(let n=1;n<=N;n++){
   const fn=f*n*Math.sqrt(1+B*n*n);if(fn>16000)break;
   const strike=n===1?1:Math.abs(Math.sin(Math.PI*n*.13))*1.35;
   const amp=vel*.11*strike/Math.pow(n,1.05);
   const tau=sustain/(1+.45*(n-1))/5;
-  const strings=n<=3?[-1.1,1.1]:[0];
+  const strings=n<=2?[-1.1,1.1]:[0];
   strings.forEach(cents=>{
    const o=c.createOscillator();o.type='sine';o.frequency.value=fn*Math.pow(2,cents/1200);
    const eg=c.createGain();const a=amp/strings.length;
@@ -1346,11 +1346,13 @@ function pianoNote(c,out,t,dur,m,vel){
  const hg=c.createGain();hg.gain.setValueAtTime(.05*vel,t);hg.gain.exponentialRampToValueAtTime(1e-4,t+.03);
  h.connect(hb);hb.connect(hg);hg.connect(g);h.start(t);h.stop(t+.04);nodes.push(h);
  g.gain.setValueAtTime(1,end);g.gain.setTargetAtTime(0,end,.07);
+ nodes[0].onended=()=>{try{g.disconnect()}catch(e){}};
  return nodes;
 }
 function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
  const c=opt.c||ctx(),master=opt.master||audio.master,sink=opt.sink||audio.nodes,spb=60/S.bpm,t0=opt.c?opt.t0:c.currentTime+.08;
- if(!opt.c){audio.t0=t0;audio.from=fromBeat}
+ if(!opt.c){audio.t0=t0;audio.from=fromBeat;audio.jobs=[];audio.ji=0}
+ const later=opt.c?(st,fn)=>fn():(st,fn)=>audio.jobs.push([st,fn]);
  const vg=c.createGain();vg.gain.value=opt.exp?1:(S.mix.vMute?0:S.mix.vVol);vg.connect(master);sink.push(vg);
  let endBeat=D.total;
  D.phrases.forEach(p=>{if(onlyKey&&p.key!==onlyKey)return;
@@ -1362,32 +1364,36 @@ function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
   const v=voiceObj();
   if(useVoice){const perf=takePerf(take,p);const ps=p.start*spb,fsec=fromBeat*spb,vopts={vibRate:5.5,vibDepth:0,fs:v.fs||1,vol:1};
    perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+n.s,off=Math.max(0,fsec-a),dur=n.e-n.s-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
-    if(!n.k){sink.push(...breathNode(c,vg,st,dur,1));return}
+    if(!n.k){later(st,()=>sink.push(...breathNode(c,vg,st,dur,1)));return}
     const k0=Math.round((n.s+off)/perf.hop),k1=Math.max(k0+2,Math.round(n.e/perf.hop));const cur=new Float32Array(k1-k0);
     for(let k=k0;k<k1;k++){const m=perf.vals[k];cur[k-k0]=hz(m==null||isNaN(m)?n.p:m)}
-    sink.push(...vocalNote(c,vg,st,dur,hz(n.p),0,{...vopts,curve:cur,vowel:(n.w||'a').charCodeAt(0)%5,consonant:n.k!==2&&off===0}))});
+    later(st,()=>sink.push(...vocalNote(c,vg,st,dur,hz(n.p),0,{...vopts,curve:cur,vowel:(n.w||'a').charCodeAt(0)%5,consonant:n.k!==2&&off===0})))});
   }else{
    p.idx.forEach(i=>{const e=S.events[i];if(e.kind!=='note')return;const s=D.starts[i],en=s+beats(e);if(en<=fromBeat)return;
-    const st=t0+Math.max(0,s-fromBeat)*spb,dur=(en-Math.max(s,fromBeat))*spb;sink.push(...pianoNote(c,vg,st,dur,e.pitch,.68))});
+    const st=t0+Math.max(0,s-fromBeat)*spb,dur=(en-Math.max(s,fromBeat))*spb;later(st,()=>sink.push(...pianoNote(c,vg,st,dur,e.pitch,.68)))});
   }
  });
  if(S.backing&&!onlyKey&&!forceTake&&(!opt.exp||opt.backing)){const bg=c.createGain();bg.gain.value=opt.exp?S.mix.bVol:(S.mix.bMute?0:S.mix.bVol);bg.connect(master);const s=c.createBufferSource();s.buffer=S.backing.buffer;s.connect(bg);const off=fromBeat*spb;if(off<s.buffer.duration){s.start(t0,off);sink.push(s,bg)}endBeat=Math.max(endBeat,S.backing.buffer.duration/spb)}
+ if(!opt.c)audio.jobs.sort((a,b)=>a[0]-b[0]);
  return endBeat;
 }
+// Build the voices that start within the next second; called on a timer and every frame while playing
+function runJobs(){if(!audio.playing||!audio.ctx)return;const lim=audio.ctx.currentTime+1;while(audio.ji<audio.jobs.length&&audio.jobs[audio.ji][0]<lim)audio.jobs[audio.ji++][1]()}
 function play(onlyKey,forceTake){
  if(audio.playing)pause();
  let from=S.playhead;if(onlyKey){from=D.byKey[onlyKey].start}else if(from>=D.total&&!(S.backing&&from*60/S.bpm<S.backing.buffer.duration))from=0;
  const end=scheduleRange(from,onlyKey,forceTake);audio.playing=true;audio.end=end;audio.startBeat=from;
+ runJobs();clearInterval(audio.timer);audio.timer=setInterval(runJobs,50);
  const tick=()=>{if(!audio.playing)return;const b=audio.from+Math.max(0,audio.ctx.currentTime-audio.t0)*S.bpm/60;
   if(b>=audio.end+.1){stopNodes();audio.playing=false;setPlayhead(onlyKey||PREFS.returnOnStop?audio.startBeat:audio.end);renderTopbar();renderRuler();return}
-  setPlayhead(b,true);audio.raf=requestAnimationFrame(tick)};
+  runJobs();setPlayhead(b,true);audio.raf=requestAnimationFrame(tick)};
  audio.raf=requestAnimationFrame(tick);renderTopbar();renderRuler();
  const unrendered=D.phrases.filter(p=>p.status!=='done').length;
  if(!onlyKey&&!forceTake&&unrendered&&!audio.hinted){audio.hinted=true;toast('未渲染的乐句用钢琴音播放旋律，渲染后会听到人声')}
 }
 // Space / play button: start, or stop (and go back to where playback started, if that option is on)
 function togglePlay(){if(audio.playing){pause();if(PREFS.returnOnStop&&audio.startBeat!=null)setPlayhead(audio.startBeat);renderRuler()}else{play();revealPlayhead()}}
-function stopNodes(){audio.nodes.forEach(n=>{try{n.stop?n.stop():0}catch(e){}try{n.disconnect()}catch(e){}});audio.nodes=[];cancelAnimationFrame(audio.raf)}
+function stopNodes(){clearInterval(audio.timer);audio.jobs=[];audio.ji=0;audio.nodes.forEach(n=>{try{n.stop?n.stop():0}catch(e){}try{n.disconnect()}catch(e){}});audio.nodes=[];cancelAnimationFrame(audio.raf)}
 function pause(){stopNodes();audio.playing=false;renderTopbar();renderRuler()}
 function stop(){pause();setPlayhead(0);roll.scrollLeft=0}
 function seek(b){const was=audio.playing;if(was)pause();setPlayhead(Math.max(0,b));if(was)play()}
@@ -1519,7 +1525,7 @@ $('#overlay').addEventListener('click',e=>{if(e.target.closest('[data-close]')||
 const MENUS={
  file:[['新建空白工程',DESK?'Ctrl+N':'',()=>newProject()],['打开工程文件…','Ctrl+O',()=>openProject()],...(DESK?[['保存','Ctrl+S',()=>saveProject(false)],['另存为…','Ctrl+Shift+S',()=>saveProject(true)]]:[]),0,
   ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};S.refF0=null;renderAll();toast('已载入示例')}],0,
-  ['导入乐谱 / 转写 JSON…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
+  ['导入乐谱（MIDI / JSON）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
  edit:()=>[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending],0,
   ['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
  help:[['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
@@ -1612,19 +1618,139 @@ function rangeHint(){const ps=S.events.filter(e=>e.kind==='note').map(e=>e.pitch
  const fit=v=>ps.filter(p=>p>=v.range[0]&&p<=v.range[1]).length/ps.length,cur=voiceObj(),best=VOICES.reduce((a,v)=>fit(v)>fit(a)?v:a,VOICES[0]);
  const out=Math.round((1-fit(cur))*ps.length);
  return best.id!==cur.id&&fit(best)>fit(cur)&&out>ps.length*.05?`。有 ${out} 个音超出 ${cur.name} 的音域，旋律在 ${pname(Math.min(...ps))}–${pname(Math.max(...ps))}，${best.name} 的音域更合适，可在左侧切换`:''}
+const sigOkOf=I=>I.sig.den===4&&[2,3,4].includes(I.sig.num);
 function songName(segs){const n=segs[0]&&segs[0].name||'';return n.replace(/(_\d+){1,2}$/,'')||n}
+// ---- Standard MIDI files (format 0/1): notes, tempo, time signature, track names, lyric / text events ----
+// Lyric bytes carry no encoding; pick the one under which all of the file's text decodes and reads most like CJK lyrics
+// (short GBK sequences are often valid UTF-8 too, so one lyric alone is not enough to tell)
+function pickEncoding(chunks){let best='utf-8',bs=-1e9;
+ for(const enc of ['utf-8','gb18030','big5','shift_jis']){let sc=0,ok=true;
+  for(const u of chunks){if(u.every(b=>b<128))continue;let t;try{t=new TextDecoder(enc,{fatal:true}).decode(u)}catch(e){ok=false;break}
+   for(const c of t){const k=c.codePointAt(0);if(k<128)continue;if(k>=0x3400&&k<=0x9fff||k>=0x3040&&k<=0x30ff)sc+=2;else if(k>=0xff00&&k<=0xffef||k>=0x3000&&k<=0x303f)sc+=1;else sc-=3}}
+  if(ok&&sc>bs){bs=sc;best=enc}}
+ return best}
+function decWith(enc){const d=new TextDecoder(enc);return u=>d.decode(u)}
+function parseMIDI(u8){
+ const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength),tag=o=>String.fromCharCode(u8[o],u8[o+1],u8[o+2],u8[o+3]);
+ if(u8.length<14||tag(0)!=='MThd')throw new Error('不是 MIDI 文件（缺少 MThd 文件头）');
+ const fmt=dv.getUint16(8),ntr=dv.getUint16(10),div=dv.getUint16(12);
+ if(div&0x8000)throw new Error('不支持按 SMPTE 时间码记录的 MIDI，请在宿主软件里按小节导出');
+ let p=8+dv.getUint32(4);const tracks=[];
+ for(let t=0;t<ntr&&p+8<=u8.length;t++){
+  const id=tag(p),end=Math.min(u8.length,p+8+dv.getUint32(p+4));p+=8;
+  if(id!=='MTrk'){p=end;continue}
+  let tick=0,rs=0;const ev=[];
+  const vlq=()=>{let v=0,b;do{b=u8[p++];v=v*128+(b&0x7f)}while(b&0x80&&p<end);return v};
+  while(p<end){tick+=vlq();if(p>=end)break;let st=u8[p];
+   if(st&0x80){p++;if(st<0xf0)rs=st}else{st=rs;if(!st)throw new Error(`第 ${t+1} 条音轨的数据损坏`)}
+   if(st===0xff){const type=u8[p++],l=vlq();ev.push({tick,meta:type,data:u8.subarray(p,Math.min(end,p+l))});p+=l}
+   else if(st===0xf0||st===0xf7){p+=vlq()}
+   else{const hi=st&0xf0,ch=st&15,d1=u8[p++],d2=hi===0xc0||hi===0xd0?0:u8[p++];
+    if(hi===0x90&&d2>0)ev.push({tick,on:true,ch,key:d1});else if(hi===0x80||hi===0x90)ev.push({tick,on:false,ch,key:d1})}}
+  p=end;tracks.push(ev)}
+ if(!tracks.length)throw new Error('MIDI 文件里没有音轨');
+ return{fmt,div,tracks};
+}
+const MEL_MARK=/^[-+~_ー～]+$/;
+function cleanLyric(x){return String(x).replace(/[\s\/\\\r\n,.，。、!！?？;；:："“”'‘’()（）\[\]【】]/g,'')}
+// Everything the import dialog shows: tempo, time signature, and one entry per melodic (track, channel) part
+function midiInfo(m,fname){
+ const tempos=[],sigs=[],parts=[],loose=[];let title='';
+ const decText=decWith(pickEncoding(m.tracks.flatMap(ev=>ev.filter(e=>e.meta===0x01||e.meta===0x03||e.meta===0x05).map(e=>e.data))));
+ m.tracks.forEach((ev,ti)=>{let name='';const open={},byCh={},lyr=[],txt=[];
+  ev.forEach(e=>{
+   if(e.meta!=null){
+    if(e.meta===0x51&&e.data.length>=3)tempos.push({tick:e.tick,bpm:60e6/((e.data[0]<<16)|(e.data[1]<<8)|e.data[2])});
+    else if(e.meta===0x58&&e.data.length>=2)sigs.push({tick:e.tick,num:e.data[0],den:1<<e.data[1]});
+    else if(e.meta===0x03&&!name)name=decText(e.data).trim();
+    else if(e.meta===0x05)lyr.push({tick:e.tick,s:decText(e.data)});
+    else if(e.meta===0x01)txt.push({tick:e.tick,s:decText(e.data)});
+    return}
+   const k=e.ch*128+e.key,o=open[k];
+   if(o!==undefined){(byCh[e.ch]=byCh[e.ch]||[]).push({s:o,e:e.tick,p:e.key});delete open[k]}
+   if(e.on)open[k]=e.tick});
+  // karaoke (.kar) files keep lyrics in text events; '@' lines are headers, / and \ mark new lines
+  let lyrics=lyr.length?lyr:txt.filter(x=>!x.s.startsWith('@')).length>4?txt.filter(x=>!x.s.startsWith('@')):[];
+  lyrics=lyrics.map(x=>({tick:x.tick,s:cleanLyric(x.s)})).filter(x=>x.s);
+  const chs=Object.keys(byCh).map(Number).filter(c=>c!==9);
+  if(ti===0&&name&&!title&&!Object.keys(byCh).length)title=name;
+  if(!chs.length){if(lyrics.length)loose.push(...lyrics);return}
+  const hit=ch=>{if(!lyrics.length)return 0;const on=new Set(byCh[ch].map(n=>Math.round(n.s/(m.div/8))));return lyrics.filter(l=>on.has(Math.round(l.tick/(m.div/8)))).length/lyrics.length};
+  const fit=Object.fromEntries(chs.map(c=>[c,hit(c)])),top=Math.max(0,...Object.values(fit));
+  chs.forEach(ch=>{const notes=byCh[ch].filter(n=>n.e>n.s).sort((a,b)=>a.s-b.s||b.p-a.p);
+   let poly=0;for(let i=1;i<notes.length;i++)if(notes[i].s<notes[i-1].e-m.div/32)poly++;
+   const ps=notes.map(n=>n.p);
+   parts.push({ti,ch,name:(name||`音轨 ${ti+1}`)+(chs.length>1?` · 通道 ${ch+1}`:''),notes,lyrics:chs.length===1||(fit[ch]===top&&top>=.5)?lyrics:[],poly,lo:Math.min(...ps),hi:Math.max(...ps)})})});
+ if(!parts.length)throw new Error('没有找到旋律音符（鼓轨不算）');
+ parts.forEach(pt=>{if(!pt.lyrics.length&&loose.length){pt.lyrics=loose;pt.looseLyrics=true}});
+ tempos.sort((a,b)=>a.tick-b.tick);sigs.sort((a,b)=>a.tick-b.tick);
+ const bpm=tempos.length?Math.round(tempos[0].bpm):120,changes=new Set(tempos.map(x=>Math.round(x.bpm))).size-1;
+ const sig=sigs[0]||{num:4,den:4};
+ const best=parts.reduce((a,pt)=>(pt.lyrics.length?1e6:0)+pt.notes.length-pt.poly*2>(a.lyrics.length?1e6:0)+a.notes.length-a.poly*2?pt:a,parts[0]);
+ return{div:m.div,fmt:m.fmt,bpm:Math.max(40,Math.min(240,bpm)),fileBpm:bpm,changes,sig,parts,def:parts.indexOf(best),
+  title:(title&&!/^(untitled|track ?\d*|音轨 ?\d*|conductor)$/i.test(title)?title:'')||String(fname||'').replace(/\.(mid|midi|kar)$/i,'')};
+}
+// One part -> a single transcription segment in "seconds" at a fixed tempo, so the transcription quantizer
+// turns it into note values exactly (MIDI positions are already on the beat grid; tempo changes only change speed)
+function midiSegment(info,pt,bpm,legato){
+ const div=info.div,spt=60/bpm/div,notes=[];let chords=0;
+ pt.notes.forEach(n=>{const last=notes[notes.length-1];
+  if(last&&n.s<last.e){if(n.s-last.s<div/32){chords++;return}last.e=n.s}  // keep the top note of a chord; cut overlaps
+  notes.push({...n})});
+ const bars=div*4*info.sig.num/info.sig.den,start=Math.floor(notes[0].s/bars)*bars,gapMin=legato?div/4:div/8;
+ // lyrics: each lyric belongs to the note starting nearest to it
+ const words=new Array(notes.length).fill(null);let li=0;
+ pt.lyrics.slice().sort((a,b)=>a.tick-b.tick).forEach(l=>{while(li<notes.length-1&&Math.abs(notes[li+1].s-l.tick)<=Math.abs(notes[li].s-l.tick))li++;
+  if(Math.abs(notes[li].s-l.tick)<=div/4)words[li]=(words[li]||'')+l.s});
+ const has=pt.lyrics.length>0;let queue=[],withLyric=0;
+ const out=[];let pos=start;
+ notes.forEach((n,i)=>{
+  if(n.s-pos>=gapMin)out.push({w:'SP',d:(n.s-pos)*spt,p:0,kind:'rest',slur:false});
+  else if(out.length&&n.s>pos)out[out.length-1].d+=(n.s-pos)*spt;   // short gaps join the previous note
+  const prevNote=out.length&&out[out.length-1].kind==='note';
+  let w=words[i];
+  if(w!=null){if(MEL_MARK.test(w))w='-';else{const ch=[...w.matchAll(/[㐀-鿿]|[A-Za-z']+|-/g)].map(x=>x[0]);w=ch.shift()||'啦';queue=ch}withLyric++}
+  else if(queue.length)w=queue.shift();
+  else w=has&&prevNote?'-':'啦';
+  out.push({w,d:(n.e-n.s)*spt,p:n.p,kind:'note',slur:w==='-'&&prevNote});pos=n.e});
+ const total=out.reduce((t,x)=>t+x.d,0);
+ return{seg:{name:pt.name,lang:'',start:0,total,notes:out,f0:null,f0hop:null,count:notes.length},chords,withLyric,noteCount:notes.length};
+}
 function importDlg(prefill){
- dialog('导入乐谱',`<div class="segs" style="margin-bottom:14px"><button data-it="json" class="on">JSON</button><button data-it="xml">MusicXML</button><button data-it="abc">ABC 记谱</button></div>
+ const pm=prefill&&prefill.midi?prefill.midi:null;if(pm)prefill=null;
+ dialog('导入乐谱',`<div class="segs" style="margin-bottom:14px"><button data-it="midi" class="${pm?'on':''}">MIDI</button><button data-it="json" class="${pm?'':'on'}">JSON</button><button data-it="xml">MusicXML</button><button data-it="abc">ABC 记谱</button></div>
  <div id="impBody"></div>`,`<button class="btn line" data-close>取消</button><button class="btn primary" id="impGo">导入</button>`,o=>{
-  let type='json',parsed=null,t=null;const body=o.querySelector('#impBody'),go=o.querySelector('#impGo');
-  const st={sel:null,bpm:90,auto:90,grid:1,ref:true};
-  const draw=()=>{parsed=null;go.textContent='导入';body.innerHTML=type==='json'?`<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="hint">支持 VocalRender 标注（word / pitch / note / pitch2word / bpm），以及带时长的歌唱转写（text / note_pitch / note_type / duration 秒，可带 time 和 f0）。</span><label class="btn line" for="impJsonFile" style="flex:none">选择文件…</label><input type="file" id="impJsonFile" accept=".json,.txt" hidden></div><textarea id="impText" spellcheck="false" placeholder='粘贴 JSON，或点“选择文件…”'></textarea><div id="impPrev" style="margin-top:12px"></div>`
+  let type=pm?'midi':'json',parsed=null,t=null;const body=o.querySelector('#impBody'),go=o.querySelector('#impGo');
+  const st={sel:null,bpm:90,auto:90,grid:1,ref:true,part:0,legato:true};
+  const draw=()=>{parsed=null;go.textContent='导入';go.disabled=false;body.innerHTML=type==='midi'?`<label class="drop" for="impMidi" id="impMidiDrop">选择 .mid / .midi 文件<br><span class="hint">也可以直接把 MIDI 文件拖进窗口</span></label><input type="file" id="impMidi" accept=".mid,.midi,.kar" hidden><div id="impPrev" style="margin-top:12px"></div>`
+   :type==='json'?`<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="hint">支持 VocalRender 标注（word / pitch / note / pitch2word / bpm），以及带时长的歌唱转写（text / note_pitch / note_type / duration 秒，可带 time 和 f0）。</span><label class="btn line" for="impJsonFile" style="flex:none">选择文件…</label><input type="file" id="impJsonFile" accept=".json,.txt" hidden></div><textarea id="impText" spellcheck="false" placeholder='粘贴 JSON，或点“选择文件…”'></textarea><div id="impPrev" style="margin-top:12px"></div>`
    :type==='xml'?`<label class="drop" for="impFile">选择 .musicxml / .xml / .mxl 文件</label><input type="file" id="impFile" accept=".musicxml,.xml,.mxl" hidden><p class="hint" style="margin-top:10px">由服务端 <span class="mono">POST /score/import</span> 解析：自动选择带歌词的单声部，可指定小节范围；非标准时值误差 ≤12.5% 时量化并提示，和弦与重叠声部会报出位置。</p>`
    :`<textarea id="impText" spellcheck="false" placeholder="X:1&#10;L:1/8&#10;Q:1/4=90&#10;K:C&#10;E G A2 G E D2 |&#10;w: 晚 风 吹 过 旧 街"></textarea><p class="hint">由服务端 <span class="mono">POST /score/import</span> 解析，小写 w: 行作为对齐歌词，下划线 _ 表示连音。</p>`;
+   if(type==='midi'){o.querySelector('#impMidi').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(f)readMidi(new Uint8Array(await f.arrayBuffer()),f.name)});
+    if(pm)readMidi(pm.bytes,pm.name)}
    if(type==='json'){const ta=o.querySelector('#impText');ta.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(analyse,250)});
     o.querySelector('#impJsonFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;ta.value=await f.text();analyse()});
     if(prefill){ta.value=prefill;prefill=null;analyse()}}};
   const prev=()=>o.querySelector('#impPrev');
+  function readMidi(bytes,name){parsed=null;go.textContent='导入';
+   try{const info=midiInfo(parseMIDI(bytes),name);parsed={kind:'midi',info,name};st.part=info.def;st.bpm=st.auto=info.bpm;const dz=o.querySelector('#impMidiDrop');if(dz)dz.innerHTML=`${esc(name)}<br><span class="hint">点这里换一个文件</span>`;showMidi()}
+   catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">无法读取 ${esc(name)}：${esc(e.message)}</p>`;go.disabled=true}}
+  function showMidi(){const I=parsed.info,sigOk=I.sig.den===4&&[2,3,4].includes(I.sig.num);
+   prev().innerHTML=`<div class="imp-stats">识别为 <b>MIDI</b>（格式 ${I.fmt}）· ${I.parts.length} 个旋律声部 · 拍号 ${I.sig.num}/${I.sig.den}${sigOk?'':'（不支持，沿用当前拍号）'} · 文件速度 ${I.fileBpm} BPM${I.changes?`<br><span style="color:var(--warn)">曲中有 ${I.changes} 处变速，统一按开头速度，音符的小节位置不变。</span>`:''}</div>
+    <div class="lab" style="font-size:11.5px;color:var(--fg-2);margin-top:10px">选择人声声部</div>
+    <div class="imp-segs">${I.parts.map((pt,i)=>`<label class="imp-seg"><input type="radio" name="impPart" data-part="${i}" ${i===st.part?'checked':''}><span class="nm">${esc(pt.name)}</span><span class="t">${pt.notes.length} 个音 · ${pname(pt.lo)}–${pname(pt.hi)} · ${pt.lyrics.length?(pt.looseLyrics?'歌词在另一条音轨':'有歌词'):'无歌词'}${pt.poly?` · ${pt.poly} 处和弦/重叠`:''}</span></label>`).join('')}</div>
+    <div class="row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+     <div class="fld" style="margin:0"><label for="impBpm">速度 BPM <span class="hint">（文件 ${I.fileBpm}）</span></label><div class="row"><input class="inp mono" id="impBpm" type="number" min="40" max="240" value="${st.bpm}" style="width:90px"><button class="btn line" id="impAuto" ${st.bpm===st.auto?'disabled':''}>恢复</button></div></div>
+     <div class="fld" style="margin:0"><div class="lab">量化网格</div><div class="segs" id="impGrid"><button data-g="1" class="${st.grid===1?'on':''}">1/32</button><button data-g="2" class="${st.grid===2?'on':''}">1/16</button></div></div>
+    </div>
+    <label class="row" style="gap:8px;font-size:12.5px;margin-bottom:10px"><input type="checkbox" id="impLegato" ${st.legato?'checked':''}> 短于 1/16 的空隙并入前一个音（连唱，不另加休止）</label>
+    <div class="card imp-stats" id="impStats"></div>`;
+   prev().querySelectorAll('[data-part]').forEach(r=>r.onchange=()=>{st.part=+r.dataset.part;stats()});
+   const bi=prev().querySelector('#impBpm');bi.oninput=()=>{const v=Math.round(+bi.value);if(v>=40&&v<=240){st.bpm=v;prev().querySelector('#impAuto').disabled=v===st.auto;stats()}};
+   prev().querySelector('#impAuto').onclick=()=>{st.bpm=st.auto;bi.value=st.auto;prev().querySelector('#impAuto').disabled=true;stats()};
+   prev().querySelectorAll('#impGrid button').forEach(b=>b.onclick=()=>{st.grid=+b.dataset.g;prev().querySelectorAll('#impGrid button').forEach(x=>x.classList.toggle('on',x===b));stats()});
+   prev().querySelector('#impLegato').onchange=e=>{st.legato=e.target.checked;stats()};
+   stats()}
   function analyse(){const txt=o.querySelector('#impText').value.trim();parsed=null;go.textContent='导入';if(!txt){prev().innerHTML='';return}
    let d;try{d=JSON.parse(txt)}catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">不是有效的 JSON：${esc(e.message)}</p>`;return}
    try{
@@ -1650,7 +1776,14 @@ function importDlg(prefill){
    const rc=prev().querySelector('#impRef');if(rc)rc.onchange=()=>{st.ref=rc.checked};
    stats()}
   function chosen(){return parsed.segs.filter((_,i)=>st.sel.has(i))}
-  function stats(){const segs=chosen(),box=prev().querySelector('#impStats');if(!segs.length){box.innerHTML='至少选一个片段';go.disabled=true;return}go.disabled=false;
+  function midiStats(){const I=parsed.info,pt=I.parts[st.part],box=prev().querySelector('#impStats');
+   const m=midiSegment(I,pt,st.bpm,st.legato),q=quantizeTranscript([m.seg],st.bpm,st.grid);parsed.m=m;parsed.q=q;go.disabled=false;
+   box.innerHTML=`将生成 <b>${q.events.length}</b> 个事件（${q.notes} 个音符），共 ${Math.ceil(q.beats/(sigOkOf(I)?I.sig.num:S.bpb))} 小节 · ${fmtTime(q.beats*60/st.bpm).slice(0,5)}<br>
+    ${pt.lyrics.length?`歌词：${m.withLyric}/${m.noteCount} 个音有歌词，其余按连音或“啦”处理`:'这个声部没有歌词，音符先填“啦”，导入后可在下方“批量歌词”一次填好'}
+    ${m.chords?`<br>${m.chords} 个和弦音已去掉，只保留最高音`:''}${q.median>0.001?`<br>量化后起音平均偏移 ${Math.round(q.median*1000)} ms（有三连音或不在网格上的音）`:''}${q.ties?` · ${q.ties} 个长音写成同音连音`:''}
+    ${q.over?`<br><span style="color:var(--warn)">${q.over} 个乐句超过单次渲染上限，导入后会标出，可插入休止拆开。</span>`:''}`;
+   go.textContent='导入'}
+  function stats(){if(parsed&&parsed.kind==='midi')return midiStats();const segs=chosen(),box=prev().querySelector('#impStats');if(!segs.length){box.innerHTML='至少选一个片段';go.disabled=true;return}go.disabled=false;
    const q=quantizeTranscript(segs,st.bpm,st.grid);parsed.q=q;
    box.innerHTML=`将生成 <b>${q.events.length}</b> 个事件（${q.notes} 个音符），共 ${Math.ceil(q.beats/S.bpb)} 小节 · ${fmtTime(q.beats*60/st.bpm).slice(0,5)}<br>
     起音和原唱的偏差：中位数 <b>${Math.round(q.median*1000)} ms</b>，90% 在 ${Math.round(q.p90*1000)} ms 以内${q.ties?` · ${q.ties} 个长音写成同音连音`:''}
@@ -1658,7 +1791,14 @@ function importDlg(prefill){
    go.textContent=segs.length>1?`导入 ${segs.length} 个片段`:'导入'}
   draw();o.querySelectorAll('[data-it]').forEach(b=>b.onclick=()=>{type=b.dataset.it;o.querySelectorAll('[data-it]').forEach(x=>x.classList.toggle('on',x===b));draw()});
   go.onclick=()=>{
-   if(type!=='json'){toast(S.service.mode==='demo'?'演示模式不解析 MusicXML / ABC，连接服务后可用。可以先导入 JSON。':'已提交到 /score/import',S.service.mode==='demo'?'err':undefined);return}
+   if(type==='midi'){if(!parsed||parsed.kind!=='midi')return toast('先选择一个 MIDI 文件','err');
+    const I=parsed.info,q=parsed.q;if(audio.playing)pause();
+    commit(()=>{S.events=q.events;S.bpm=st.bpm;if(sigOkOf(I))S.bpb=I.sig.num;S.sel.clear();S.curPhrase=null});
+    S.refF0=null;S.name=I.title||S.name;$('#projName').value=S.name;$('#bpm').value=S.bpm;$('#bpb').value=S.bpb;
+    closeDialog();setPlayhead(0);renderAll();roll.scrollLeft=0;
+    const ps=S.events.filter(e=>e.kind==='note').map(e=>e.pitch);if(ps.length)roll.scrollTop=(MAXP-ps.reduce((a,b)=>a+b)/ps.length)*S.rowH-roll.clientHeight/2;
+    toast(`已导入 ${q.notes} 个音符 · ${S.bpm} BPM${parsed.m.withLyric?'':'，用下方“批量歌词”填词'}，可用 Ctrl+Z 撤销${rangeHint()}`);return}
+   if(type!=='json'){toast(S.service.mode==='demo'?'演示模式不解析 MusicXML / ABC，连接服务后可用。可以先导入 MIDI 或 JSON。':'已提交到 /score/import',S.service.mode==='demo'?'err':undefined);return}
    if(!parsed){analyse();if(!parsed)return toast('先粘贴或选择一个能识别的 JSON','err')}
    if(parsed.kind==='label'){const{x,ev}=parsed;commit(()=>{S.events=ev;S.bpm=+x.bpm||S.bpm;$('#bpm').value=S.bpm;S.sel.clear()});S.refF0=null;closeDialog();toast(`已导入 ${ev.length} 个事件`);return}
    const segs=chosen();if(!segs.length)return;const q=parsed.q||quantizeTranscript(segs,st.bpm,st.grid);
@@ -1758,15 +1898,17 @@ async function saveProject(as){
 }
 async function openProject(){
  if(!DESK){$('#projFile').click();return}
- try{const r=await DESK.openFile();if(!r)return;openJSONText(r.text,{path:r.path,name:r.name},r.name)}
+ try{const r=await DESK.openFile();if(!r)return;if(r.b64!=null)importDlg({midi:{bytes:b64ToBytes(r.b64),name:r.name}});else openJSONText(r.text,{path:r.path,name:r.name},r.name)}
  catch(e){toast('无法打开：'+e.message,'err')}
 }
 function newProject(){confirmDlg('新建空白工程','当前乐谱和渲染版本会被清空。确定继续吗？','新建',()=>{loadProject({events:[],name:'未命名工程',bpm:S.bpm,bpb:S.bpb,voice:S.voice,ckpt:S.ckpt},null)})}
-$('#projFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{openJSONText(await f.text(),null,f.name)}catch(err){toast('无法打开：'+err.message,'err')}});
+const isMidiName=n=>/\.(mid|midi|kar)$/i.test(n||'');
+$('#projFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{if(isMidiName(f.name))importDlg({midi:{bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}});else openJSONText(await f.text(),null,f.name)}catch(err){toast('无法打开：'+err.message,'err')}});
 document.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault()});
 document.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files[0];if(!f||e.defaultPrevented)return;e.preventDefault();
+ if(isMidiName(f.name)){f.arrayBuffer().then(b=>{closeDialog();importDlg({midi:{bytes:new Uint8Array(b),name:f.name}})});return}
  if(/\.(vrproj|json|txt)$/i.test(f.name)){f.text().then(t=>{const p=DESK&&DESK.pathForFile?DESK.pathForFile(f):null;openJSONText(t,p?{path:p,name:f.name}:null,f.name)}).catch(err=>toast('无法打开：'+err.message,'err'))}
- else toast('拖入 .vrproj 打开工程；参考音频拖到左侧声线区，伴奏拖到伴奏轨')});
+ else toast('拖入 .vrproj 打开工程，或拖入 MIDI / JSON 导入乐谱；参考音频拖到左侧声线区，伴奏拖到伴奏轨')});
 // File shortcuts work even while typing in a field, like other Windows editors
 document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||e.altKey||!$('#overlay').hidden)return;const k=e.key.toLowerCase();
  if(k==='s'){e.preventDefault();e.stopPropagation();saveProject(e.shiftKey)}
@@ -1782,7 +1924,7 @@ if(DESK){
    o.querySelector('#cNo').onclick=()=>{closeDialog();res(true)};
    o.querySelector('#cCancel').onclick=()=>{closeDialog();res(false)}},{modal:true});
  }));
- if(DESK.onOpenFile)DESK.onOpenFile(r=>{try{openJSONText(r.text,{path:r.path,name:r.name},r.name)}catch(e){toast('无法打开 '+r.name+'：'+e.message,'err')}});
+ if(DESK.onOpenFile)DESK.onOpenFile(r=>{try{if(r.b64!=null)importDlg({midi:{bytes:b64ToBytes(r.b64),name:r.name}});else openJSONText(r.text,{path:r.path,name:r.name},r.name)}catch(e){toast('无法打开 '+r.name+'：'+e.message,'err')}});
  if(DESK.onAccentChange)DESK.onAccentChange(h=>{window.__vrAccent&&window.__vrAccent(h);perfCache.clear();renderAll();renderVoices()});
  updateTitle();
 }
