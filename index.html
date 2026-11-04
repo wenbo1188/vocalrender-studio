@@ -97,10 +97,26 @@ svg.i{width:16px;height:16px;flex:none}
 .proj:hover,.proj:focus{border-color:var(--line-2);background:var(--raised)}
 .transport{display:flex;align-items:center;gap:4px;margin-inline:auto;background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:3px;flex:none}
 .transport .play{background:var(--fg);color:var(--panel)}
-.tc{display:grid;grid-template-columns:auto auto;column-gap:6px;align-items:baseline;padding:0 10px;line-height:1.2;min-width:130px;cursor:help}
+.tc{position:relative;display:grid;grid-template-columns:auto auto;column-gap:6px;align-items:baseline;padding:0 10px;line-height:1.2;min-width:130px;cursor:pointer}
 .tc .tl{font-size:9.5px;color:var(--fg-3);letter-spacing:.04em;text-align:right}
 .tc .big{font-size:14px;font-weight:600}
 .tc .small{font-size:10.5px;color:var(--fg-3)}
+.tc:hover{background:var(--accent-soft);border-radius:5px}
+.tc-input{position:absolute;inset:1px 2px;width:auto;min-width:0;border:1.5px solid var(--accent);border-radius:4px;background:var(--raised);color:var(--fg);padding:0 6px;font-size:13px;z-index:2}
+.ruler .ghost{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--play);pointer-events:none;z-index:7}
+.ruler .ghost span{position:absolute;top:2px;left:5px;font:600 10px/16px var(--f-mono);background:var(--raised);color:var(--fg);border:1px solid var(--line-2);border-radius:3px;padding:0 5px;white-space:nowrap;box-shadow:var(--shadow)}
+.gghost{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--play);opacity:.45;pointer-events:none;z-index:6}
+.startmark{position:absolute;top:0;bottom:0;width:0;border-left:2px solid color-mix(in srgb,var(--play) 40%,transparent);pointer-events:none;z-index:7}
+.startmark::before{content:"";position:absolute;top:0;left:-6px;border:5px solid transparent;border-top:7px solid color-mix(in srgb,var(--play) 55%,transparent)}
+.f0ref{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.f0ref path{fill:none;stroke:var(--fg-3);stroke-width:1.3;opacity:.8;stroke-linejoin:round}
+.imp-segs{display:flex;flex-direction:column;gap:2px;max-height:160px;overflow:auto;margin:6px 0 12px;border:1px solid var(--line);border-radius:6px;padding:4px}
+.imp-seg{display:flex;gap:8px;align-items:center;font-size:12.5px;padding:5px 6px;border-radius:4px;cursor:pointer}
+.imp-seg:hover{background:var(--accent-soft)}
+.imp-seg .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imp-seg .t{color:var(--fg-3);margin-left:auto;font-family:var(--f-mono);font-size:11px;white-space:nowrap}
+.imp-stats{font-size:12px;line-height:1.75;color:var(--fg-2)}
+.imp-stats b{color:var(--fg);font-weight:600}
 .field-mini{display:flex;align-items:center;gap:4px;padding:0 6px;color:var(--fg-3);font-size:11px}
 .field-mini input,.field-mini select{height:26px;border:1px solid var(--line);border-radius:5px;background:var(--panel);padding:0 6px;width:54px;color:var(--fg);font-family:var(--f-mono);font-size:12px}
 .field-mini select{width:auto;font-family:var(--f-ui)}
@@ -310,6 +326,12 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .toast.err{background:var(--err);color:#fff}
 @keyframes tin{from{transform:translateY(6px);opacity:0}}
 .mob-only{display:none}
+@media (max-width:1560px){ .svc{display:none} }
+@media (max-width:1400px){ .proj{display:none} }
+@media (max-width:1180px){ .brand small{display:none} .menus .btn{padding:0 7px} }
+@media (max-width:980px){ #btnReturn,#btnFollow{display:none} .menus .btn{padding:0 5px} .ckpt{max-width:104px} .field-mini{padding:0 3px} }
+@media (max-width:1060px){ .tc .tl{display:none} .tc{min-width:96px;grid-template-columns:auto} .ckpt{max-width:124px} #btnHome{display:none} }
+@media (max-width:1320px){ .field-mini .fl{display:none} }
 @media (max-width:1180px){ .work{grid-template-columns:232px minmax(0,1fr) 280px} }
 @media (max-width:980px){
   .work{grid-template-columns:232px minmax(0,1fr)}
@@ -378,7 +400,8 @@ html.win11 .brand b{font-weight:400;font-size:12px}
 html.win11 .brand b::after{content:" Studio"}
 html.win11 .brand small,html.win11 .svc{display:none}
 html.win11 .ckpt{max-width:160px}
-@media (max-width:1380px){html.win11 .proj{display:none}}
+@media (max-width:1520px){html.win11 .proj{display:none}}
+@media (max-width:1320px){html.win11 .brand b{display:none}}
 html.win11 .surface{border-radius:8px;border-color:var(--line);background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.04)}
 html.win11 .status{background:transparent;border:0;height:24px;padding:0 6px;font-size:12px}
 html.win11 .btn{border-radius:4px;height:32px}
@@ -462,11 +485,13 @@ html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
     <input class="proj" id="projName" aria-label="工程名称" value="晚风街口">
     <div class="transport" role="group" aria-label="走带控制">
       <button class="btn icon" id="btnHome" title="回到开头 (Home)"></button>
-      <button class="btn icon play" id="btnPlay" title="播放 / 暂停 (Space)"></button>
+      <button class="btn icon play" id="btnPlay" title="播放 / 停止 (Space)"></button>
       <button class="btn icon" id="btnStop" title="停止并回到开头 (Esc)"></button>
-      <div class="tc" title="播放头位置&#10;小节：小节.拍.tick（每拍 960 tick）&#10;时间：分:秒.毫秒，按当前 BPM 换算"><span class="tl">小节</span><span class="big mono" id="tcBar">1.1.000</span><span class="tl">时间</span><span class="small mono" id="tcTime">00:00.000</span></div>
-      <label class="field-mini">BPM <input id="bpm" type="number" min="40" max="240" step="1" value="90"></label>
-      <label class="field-mini">拍号 <select id="bpb"><option value="4">4/4</option><option value="3">3/4</option><option value="2">2/4</option><option value="6">6/8</option></select></label>
+      <button class="btn icon" id="btnReturn"></button>
+      <button class="btn icon" id="btnFollow"></button>
+      <div class="tc" id="tc" role="button" tabindex="0" title="播放头位置，单击输入要跳转的位置 (Ctrl+G)&#10;小节：小节.拍.tick（每拍 960 tick）&#10;时间：分:秒.毫秒，按当前 BPM 换算"><span class="tl">小节</span><span class="big mono" id="tcBar">1.1.000</span><span class="tl">时间</span><span class="small mono" id="tcTime">00:00.000</span></div>
+      <label class="field-mini" title="速度 BPM"><span class="fl">BPM</span> <input id="bpm" aria-label="速度 BPM" type="number" min="40" max="240" step="1" value="90"></label>
+      <label class="field-mini" title="拍号"><span class="fl">拍号</span> <select id="bpb" aria-label="拍号"><option value="4">4/4</option><option value="3">3/4</option><option value="2">2/4</option><option value="6">6/8</option></select></label>
     </div>
     <select class="ckpt" id="ckpt" title="模型版本">
       <option value="VocalRender-Pro">VocalRender-Pro</option>
@@ -496,7 +521,7 @@ html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
             <div class="vol">音量<input id="bVol" type="range" min="0" max="1" step="0.01" value="0.7"></div>
           </div>
           <input type="file" id="bkFile" accept="audio/*" hidden>
-          <input type="file" id="projFile" accept=".vrproj,.json" hidden>
+          <input type="file" id="projFile" accept=".vrproj,.json,.txt" hidden>
         </section>
         <section class="sec">
           <div class="sec-h"><h3>参考声线</h3><span class="tag">2–8 秒清唱</span></div>
@@ -535,6 +560,7 @@ html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
           <button class="btn icon" id="btnRedo" title="重做 (Ctrl+Shift+Z)"></button>
           <button class="btn icon" id="btnDel" title="删除选中 (Delete)" disabled></button>
         </div>
+        <button class="btn line on" id="btnRef" hidden title="显示导入时带来的原唱音高（f0）参考线"></button>
         <button class="btn line on" id="btnF0" title="显示渲染结果的实际音高线（F0）"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c2.5 0 3-6 6-6s2.5 5 5 5 2.5-7 7-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>音高线</button>
         <span class="tb-note">时值吸附 12 种音符 · 后续自动顺延</span>
         <div class="seg" style="margin-left:8px">
@@ -618,6 +644,9 @@ const ICONS={
  panel:'<rect x="3.5" y="4.5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M14.5 4.5v15" stroke="currentColor" stroke-width="1.8"/>',
  panelL:'<rect x="3.5" y="4.5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 4.5v15" stroke="currentColor" stroke-width="1.8"/>',
  x:'<path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+ ret:'<path d="M5 4v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.6 9A7.5 7.5 0 1 1 5 13.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+ follow:'<path d="M4 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 12h12M15.5 7.5 20 12l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+ wave:'<path d="M3 13c2 0 2.5-5 5-5s2.5 8 5 8 2.5-6 5-6 2 3 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-dasharray="3 2.2"/>',
  trash:'<path d="M4.5 6.5h15M9.5 6.5V4.8c0-.7.5-1.3 1.2-1.3h2.6c.7 0 1.2.6 1.2 1.3v1.7M6.5 6.5l.8 12.2c.1 1 .9 1.8 1.9 1.8h5.6c1 0 1.8-.8 1.9-1.8l.8-12.2M10 10.5v6M14 10.5v6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
  render:'<path d="M4 13v-2M8 17V7M12 20V4M16 16V8M20 13v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'};
 const icon=(n,s=16)=>`<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -629,6 +658,9 @@ let UID=1; const uid=()=>'e'+(UID++).toString(36)+Math.random().toString(36).sli
 function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
+// Editor preferences, remembered per browser / per desktop install
+const PREFS=Object.assign({clickLocate:true,returnOnStop:true,follow:true,showRef:true},store.get('vrstudio.prefs')||{});
+const savePrefs=()=>store.set('vrstudio.prefs',PREFS);
 
 /* ================= state ================= */
 function sampleEvents(){return SAMPLE.map(([w,p,d])=>({id:uid(),kind:w==='SP'?'rest':w==='AP'?'breath':'note',word:w,pitch:p,dur:DC[d]}))}
@@ -649,6 +681,7 @@ if(saved&&Array.isArray(saved.events)&&saved.events.length){
  if(Array.isArray(saved.customVoices))restoreVoices(saved.customVoices);
  if(saved.gen) Object.assign(S.gen,saved.gen);
  if(saved.renders) S.renders=saved.renders;
+ if(saved.refF0) S.refF0=saved.refF0;
 }
 S.quickHidden=!!store.get('vrstudio.quickHidden');
 if(store.get('vrstudio.showF0')===false)S.showF0=false;
@@ -752,6 +785,8 @@ function renderRoll(){
  const v=voiceObj();let h='';
  const yTop=(MAXP-v.range[1])*S.rowH,yBot=(MAXP-v.range[0]+1)*S.rowH;
  h+=`<div class="outband" style="top:0;height:${yTop}px"></div><div class="outband" style="top:${yBot}px;bottom:0"></div>`;
+ h+=refSVG(W,H);
+ if(ghostBeat!=null)h+=`<div class="gghost" id="gGhost" style="left:${ghostBeat*S.ppb}px"></div>`;
  S.events.forEach((e,i)=>{const x=D.starts[i]*S.ppb,w=beats(e)*S.ppb;const sel=S.sel.has(e.id);
   if(e.kind!=='note'){h+=`<div class="rest${e.kind==='breath'?' breath':''}${sel?' sel':''}${erasing(e)?' erasing':''}" data-i="${i}" style="left:${x}px;width:${w}px" title="${e.kind==='breath'?'换气 AP':'休止 SP'} · ${NV[e.dur].n}"><span class="rl">${e.kind==='breath'?(w>=64?'AP 换气':'AP'):'SP'}</span></div>`;return}
   const y=(MAXP-e.pitch)*S.rowH;const mel=e.word==='-';
@@ -772,6 +807,8 @@ function renderRuler(){
   for(let k=1;k<S.bpb;k++)h+=`<div class="beat-t" style="left:${(b+k)*S.ppb}px"></div>`}
  D.phrases.forEach(p=>{const r=S.renders[p.key];const prog=r&&r.job&&r.job.state==='rendering'?r.job.progress:0;
   h+=`<div class="pband ${p.status}${S.curPhrase===p.key?' cur':''}" data-key="${p.key}" style="left:${p.start*S.ppb+1}px;width:${(p.end-p.start)*S.ppb-2}px" title="乐句 ${p.n} · ${STATUS_TXT[p.status]}"><span class="pd"></span>P${p.n} · ${STATUS_TXT[p.status]}${prog?` ${Math.round(prog*100)}%`:''}${prog?`<span class="pf" style="transform:scaleX(${prog})"></span>`:''}</div>`});
+ if(audio.playing&&PREFS.returnOnStop&&audio.startBeat!=null)h+=`<div class="startmark" style="left:${audio.startBeat*S.ppb}px" title="停止后回到这里"></div>`;
+ if(ghostBeat!=null)h+=`<div class="ghost" id="rGhost" style="left:${ghostBeat*S.ppb}px"><span>${posStr(ghostBeat)}</span></div>`;
  h+=`<div class="phead" id="phRuler" style="left:${S.playhead*S.ppb}px"></div>`;
  rulerIn.style.width=W+'px';rulerIn.innerHTML=h;
 }
@@ -1028,7 +1065,14 @@ function hl(json){return json.replace(/("(?:\\.|[^"\\])*")(\s*:)?|(-?\b\d+(?:\.\
 /* ================= status + topbar ================= */
 function posStr(b){const bar=Math.floor(b/S.bpb)+1,beat=Math.floor(b%S.bpb)+1,tick=Math.round((b%1)*960);return `${bar}.${beat}.${String(tick).padStart(3,'0')}`}
 function fmtTime(s){const m=Math.floor(s/60),r=s-m*60;return `${String(m).padStart(2,'0')}:${r.toFixed(3).padStart(6,'0')}`}
+// Original-singer pitch imported with a transcription, drawn faintly under the notes
+function refSVG(W,H){const r=S.refF0;if(!r||!PREFS.showRef||!r.b||!r.b.length)return '';let d='',pen=false,lx=-9;
+ for(let k=0;k<r.b.length;k++){const m=r.m[k];if(m==null){pen=false;continue}const x=r.b[k]*S.ppb;
+  if(pen&&x-lx<1.5&&r.m[k+1]!=null)continue;d+=(pen?'L':'M')+x.toFixed(1)+' '+((MAXP-m+.5)*S.rowH).toFixed(1);pen=true;lx=x}
+ return d?`<svg class="f0ref" width="${W}" height="${H}" aria-hidden="true"><path d="${d}"/></svg>`:'';
+}
 function renderStatus(){
+ const rb=$('#btnRef');if(rb){rb.hidden=!S.refF0;rb.classList.toggle('on',PREFS.showRef)}
  const bdel=$('#btnDel');if(bdel){bdel.disabled=!S.sel.size;bdel.title=S.sel.size?`删除选中的 ${countText(countOf(S.sel))} (Delete)`:'删除选中 (Delete)'}
  const errs=D.issues.filter(x=>x.lv==='err').length,warns=D.issues.length-errs;
  const notes=S.events.filter(e=>e.kind==='note').length;
@@ -1090,7 +1134,7 @@ content.addEventListener('pointerdown',e=>{
   selectIdx(i,e);
   const before=snap();
   const mode=e.target.classList.contains('edge')?'resize':(ev.kind==='note'?'pitch':'none');
-  drag={mode,i,startY:e.clientY,startX:e.clientX,cx0:cx,cy0:cy,mods:e.shiftKey||e.ctrlKey||e.metaKey,before,orig:S.events.map(x=>x.pitch),lastDy:0};
+  drag={mode,i,startY:e.clientY,startX:e.clientX,cx0:cx,cy0:cy,alt:e.altKey,mods:e.shiftKey||e.ctrlKey||e.metaKey,before,orig:S.events.map(x=>x.pitch),lastDy:0};
   content.setPointerCapture(e.pointerId);
   if(ev.kind==='note')tone(ev.pitch,.18);
   renderAll();return}
@@ -1100,7 +1144,7 @@ content.addEventListener('pointerdown',e=>{
   return}
  // select tool on empty grid: drag a box to select; Shift/Ctrl adds to the selection
  const add=e.shiftKey||e.ctrlKey||e.metaKey;if(!add){S.sel.clear();S.curPhrase=null}
- drag={mode:'marquee',cx0:cx,cy0:cy,base:new Set(S.sel),el:null,moved:false};content.setPointerCapture(e.pointerId);renderAll();
+ drag={mode:'marquee',cx0:cx,cy0:cy,alt:e.altKey,base:new Set(S.sel),el:null,moved:false};content.setPointerCapture(e.pointerId);renderAll();
 });
 function eraseAt(e){
  const el=document.elementFromPoint(e.clientX,e.clientY),n=el&&el.closest?el.closest('#content .note,#content .rest'):null;if(!n)return;
@@ -1137,13 +1181,15 @@ content.addEventListener('pointermove',e=>{
 });
 const endDrag=()=>{if(!drag)return;const d=drag;drag=null;
  if(d.mode==='erase'){if(!d.ids.size)return renderRoll();const c=countOf([...d.ids]);commit(()=>{S.events=S.events.filter(x=>!d.ids.has(x.id));S.sel.clear()});if(c.n>1)toast(`已删除 ${countText(c)}，Ctrl+Z 可撤销`);return}
- if(d.mode==='marquee'){if(d.el)d.el.remove();renderAll();return}
- if(snap()!==d.before)pushHist(d.before);renderAll()};
+ // a plain click (no drag) on empty grid or on a rest also moves the playhead there, like 'locate when clicked in empty space'
+ if(d.mode==='marquee'){if(d.el)d.el.remove();renderAll();if(!d.moved&&PREFS.clickLocate)seek(snapLocate(d.cx0/S.ppb,d.alt));return}
+ if(snap()!==d.before)pushHist(d.before);renderAll();
+ if(d.mode==='none'&&PREFS.clickLocate)seek(snapLocate(d.cx0/S.ppb,d.alt))};
 content.addEventListener('pointerup',endDrag);content.addEventListener('pointercancel',endDrag);
 // right-click: menu for the selection (a note outside the selection becomes the selection first)
 content.addEventListener('contextmenu',e=>{e.preventDefault();if(drag)return;if(lyrEdit)closeLyr(true);
  const n=e.target.closest('.note,.rest');if(n){const ev=S.events[+n.dataset.i];if(ev&&!S.sel.has(ev.id)){S.sel=new Set([ev.id]);S.anchor=ev.id;S.curPhrase=null;renderAll()}}
- popMenu(rollMenu(),e.clientX,e.clientY)});
+ popMenu(rollMenu(snapLocate((e.clientX-content.getBoundingClientRect().left)/S.ppb,e.altKey)),e.clientX,e.clientY)});
 const clampP=p=>Math.max(MINP,Math.min(MAXP,p));
 
 function openLyr(i){
@@ -1173,13 +1219,23 @@ function applyWord(e,w){if(w==='SP'){e.kind='rest';e.word='SP';e.pitch=0}else if
 function tokenize(s){const out=[];const re=/SP|AP|-|[㐀-鿿]|[A-Za-z']+/g;let m;while((m=re.exec(s)))out.push(m[0]);return out}
 
 /* ruler & lanes */
-$('#ruler').addEventListener('pointerdown',e=>{
- const pb=e.target.closest('.pband');if(pb){selectPhrase(pb.dataset.key,true);return}
- const r=rulerIn.getBoundingClientRect();let b=(e.clientX-r.left)/S.ppb;
- if(!e.altKey){let best=b,bd=1e9;[...D.starts,D.total].forEach(s=>{const d=Math.abs(s-b);if(d<bd){bd=d;best=s}});if(bd*S.ppb<14)b=best}
- seek(Math.max(0,b));
+let scrub=null,ghostBeat=null;
+const rulerBeat=e=>snapLocate((e.clientX-rulerIn.getBoundingClientRect().left)/S.ppb,e.altKey);
+function showGhost(b){ghostBeat=b;let g=$('#rGhost');if(!g){renderRuler();g=$('#rGhost')}else{g.style.left=b*S.ppb+'px';g.firstChild.textContent=posStr(b)}
+ let gg=$('#gGhost');if(!gg){gg=document.createElement('div');gg.className='gghost';gg.id='gGhost';content.appendChild(gg)}gg.style.left=b*S.ppb+'px'}
+function hideGhost(){ghostBeat=null;const g=$('#rGhost'),gg=$('#gGhost');if(g)g.remove();if(gg)gg.remove()}
+$('#ruler').addEventListener('pointerdown',e=>{if(e.button!==0)return;
+ const pb=e.target.closest('.pband');if(pb){const p=D.byKey[pb.dataset.key];selectPhrase(pb.dataset.key,true);if(p)seek(p.start);return}
+ // click or drag on the ruler: the playhead follows the pointer (scrub); playback resumes from where it is released
+ scrub={was:audio.playing};if(audio.playing)pause();setPlayhead(rulerBeat(e));$('#ruler').setPointerCapture(e.pointerId);
 });
-$('#lanes').addEventListener('click',e=>{const s=e.target.closest('.lseg');if(s){selectPhrase(s.dataset.key,true)}});
+$('#ruler').addEventListener('pointermove',e=>{if(e.target.closest('.pband')&&!scrub){hideGhost();return}const b=rulerBeat(e);showGhost(b);
+ if(scrub){setPlayhead(b);const rr=roll.getBoundingClientRect();if(e.clientX>rr.right-24)roll.scrollLeft+=12;else if(e.clientX<rr.left+24)roll.scrollLeft-=12}});
+const endScrub=()=>{if(!scrub)return;const w=scrub.was;scrub=null;if(w)play()};
+$('#ruler').addEventListener('pointerup',endScrub);$('#ruler').addEventListener('pointercancel',endScrub);
+$('#ruler').addEventListener('pointerleave',()=>{if(!scrub)hideGhost()});
+$('#ruler').addEventListener('dblclick',e=>{if(e.target.closest('.pband')||audio.playing)return;setPlayhead(rulerBeat(e));play()});
+$('#lanes').addEventListener('click',e=>{const s=e.target.closest('.lseg');if(s)selectPhrase(s.dataset.key,true);seek(snapLocate((e.clientX-lanesIn.getBoundingClientRect().left)/S.ppb,e.altKey))});
 $('#ruler').addEventListener('contextmenu',e=>{e.preventDefault();const pb=e.target.closest('.pband');if(!pb||!D.byKey[pb.dataset.key])return;selectPhrase(pb.dataset.key,false);popMenu(phraseMenu(pb.dataset.key),e.clientX,e.clientY)});
 function selectPhrase(key,showTakes){const p=D.byKey[key];if(!p)return;S.curPhrase=key;S.sel=new Set(p.idx.map(i=>S.events[i].id));if(showTakes)S.tab='takes';showInspOnMobile();renderAll()}
 $('#keysIn').addEventListener('pointerdown',e=>{const k=e.target.closest('.key');if(k)tone(+k.dataset.p,.35)});
@@ -1204,12 +1260,14 @@ function deletePhrase(key){const p=D.byKey[key];if(!p)return;const ids=new Set(p
  // also drop its trailing rest when that would leave two rests in a row
  const prev=S.events[p.idx[0]-1];if(p.trail!=null&&(!prev||prev.kind==='rest'))ids.add(S.events[p.trail].id);
  const c=countOf(ids);commit(()=>{S.events=S.events.filter(e=>!ids.has(e.id));S.sel.clear();S.curPhrase=null});toast(`已删除乐句 P${p.n}（${countText(c)}），Ctrl+Z 可撤销`)}
-function rollMenu(){const c=countOf(S.sel),p=curPhrase();return[
+function rollMenu(at){const c=countOf(S.sel),p=curPhrase();return[
+ ['从这里播放','双击标尺',()=>{if(audio.playing)pause();setPlayhead(at);play()}],['播放头移到这里','',()=>seek(at)],0,
  [c.n?`删除 ${countText(c)}`:'删除','Delete',()=>delSel(false),!c.n],
  ['删除并保留空位（改为休止）','Shift+Delete',()=>delSel(true),!c.n],0,
  [p?`选中整句 P${p.n}`:'选中整句','',()=>selectPhrase(p.key,false),!p],
  [p?`删除整句 P${p.n}`:'删除整句','',()=>deletePhrase(p.key),!p],0,
  ['全选','Ctrl+A',selectAll],['取消选择','Esc',()=>{S.sel.clear();S.curPhrase=null;renderAll()},!c.n]]}
+
 function phraseMenu(key){const p=D.byKey[key];return[
  [`渲染 P${p.n}`,'',()=>{S.curPhrase=key;enqueue(key)},!renderable(p)],[`试听 P${p.n}`,'',()=>play(key)],0,
  [`选中整句 P${p.n}`,'',()=>selectPhrase(key,false)],[`删除整句 P${p.n}`,'',()=>deletePhrase(key)]]}
@@ -1319,21 +1377,45 @@ function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
 function play(onlyKey,forceTake){
  if(audio.playing)pause();
  let from=S.playhead;if(onlyKey){from=D.byKey[onlyKey].start}else if(from>=D.total&&!(S.backing&&from*60/S.bpm<S.backing.buffer.duration))from=0;
- const end=scheduleRange(from,onlyKey,forceTake);audio.playing=true;audio.end=end;
+ const end=scheduleRange(from,onlyKey,forceTake);audio.playing=true;audio.end=end;audio.startBeat=from;
  const tick=()=>{if(!audio.playing)return;const b=audio.from+Math.max(0,audio.ctx.currentTime-audio.t0)*S.bpm/60;
-  if(b>=audio.end+.1){stopNodes();audio.playing=false;setPlayhead(onlyKey?audio.from:audio.end);renderTopbar();return}
+  if(b>=audio.end+.1){stopNodes();audio.playing=false;setPlayhead(onlyKey||PREFS.returnOnStop?audio.startBeat:audio.end);renderTopbar();renderRuler();return}
   setPlayhead(b,true);audio.raf=requestAnimationFrame(tick)};
- audio.raf=requestAnimationFrame(tick);renderTopbar();
+ audio.raf=requestAnimationFrame(tick);renderTopbar();renderRuler();
  const unrendered=D.phrases.filter(p=>p.status!=='done').length;
  if(!onlyKey&&!forceTake&&unrendered&&!audio.hinted){audio.hinted=true;toast('未渲染的乐句用钢琴音播放旋律，渲染后会听到人声')}
 }
+// Space / play button: start, or stop (and go back to where playback started, if that option is on)
+function togglePlay(){if(audio.playing){pause();if(PREFS.returnOnStop&&audio.startBeat!=null)setPlayhead(audio.startBeat);renderRuler()}else{play();revealPlayhead()}}
 function stopNodes(){audio.nodes.forEach(n=>{try{n.stop?n.stop():0}catch(e){}try{n.disconnect()}catch(e){}});audio.nodes=[];cancelAnimationFrame(audio.raf)}
-function pause(){stopNodes();audio.playing=false;renderTopbar()}
+function pause(){stopNodes();audio.playing=false;renderTopbar();renderRuler()}
 function stop(){pause();setPlayhead(0);roll.scrollLeft=0}
-function seek(b){const was=audio.playing;if(was)pause();setPlayhead(b);if(was)play()}
+function seek(b){const was=audio.playing;if(was)pause();setPlayhead(Math.max(0,b));if(was)play()}
 function setPlayhead(b,follow){S.playhead=b;const x=b*S.ppb+'px';['phGrid','phRuler','phLanes'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.left=x});
  $('#tcBar').textContent=posStr(b);$('#tcTime').textContent=fmtTime(b*60/S.bpm);
- if(follow){const px=b*S.ppb;if(px>roll.scrollLeft+roll.clientWidth-60)roll.scrollLeft=px-60}}
+ if(follow&&PREFS.follow&&!scrub){const px=b*S.ppb;if(px>roll.scrollLeft+roll.clientWidth-60||px<roll.scrollLeft)roll.scrollLeft=px-60}}
+function revealPlayhead(){const px=S.playhead*S.ppb;if(px<roll.scrollLeft+20||px>roll.scrollLeft+roll.clientWidth-40)roll.scrollLeft=Math.max(0,px-roll.clientWidth/3)}
+// Where a click lands: next to a note boundary it snaps to it, otherwise to the grid (1/16, 1/8 or a beat, by zoom); Alt = no snap
+function snapLocate(b,free){b=Math.max(0,b);if(free)return b;
+ const tol=10/S.ppb;let best=null,bd=tol;D.starts.concat([D.total]).forEach(x=>{const d=Math.abs(x-b);if(d<bd){bd=d;best=x}});if(best!=null)return best;
+ const g=S.ppb>=96?.25:S.ppb>=48?.5:1;return Math.round(b/g)*g}
+function nudge(dir,bar){const step=bar?S.bpb:1,ph=S.playhead;seek(dir>0?Math.floor(ph/step+1e-6)*step+step:Math.max(0,Math.ceil(ph/step-1e-6)*step-step));revealPlayhead()}
+function jumpPhrase(dir){const ph=S.playhead,st=D.phrases.map(p=>p.start);let b=dir>0?st.find(x=>x>ph+1e-6):[...st].reverse().find(x=>x<ph-1e-6);if(b==null)b=dir>0?D.total:0;seek(b);revealPlayhead()}
+function selStart(){const ix=selIdx();return ix.length?D.starts[Math.min(...ix)]:null}
+function locateSelection(){const b=selStart();if(b==null)return toast('先选中音符，再按 L 把播放头移过去');seek(b);revealPlayhead()}
+function playFromSelection(){const b=selStart();if(audio.playing)pause();if(b!=null)setPlayhead(b);play();revealPlayhead()}
+// Type a position into the transport: bar.beat(.tick) like 5.2 or 5.2.480, or time like 1:23.5
+function parsePos(t){t=String(t).trim().replace(/：/g,':').replace(/。/g,'.');let m;
+ if((m=t.match(/^(\d+):(\d+(?:\.\d+)?)$/)))return(+m[1]*60+ +m[2])*S.bpm/60;
+ if((m=t.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/))){const bar=+m[1],beat=m[2]?+m[2]:1,tick=m[3]?+m[3]:0;if(bar<1||beat<1||beat>S.bpb||tick>=960)return null;return(bar-1)*S.bpb+beat-1+tick/960}
+ return null}
+function gotoPos(){const tc=$('#tc');if(tc.querySelector('input'))return;
+ const inp=document.createElement('input');inp.className='tc-input mono';inp.id='tcInput';inp.value=posStr(S.playhead).replace(/\.000$/,'');inp.setAttribute('aria-label','跳转到位置：小节.拍 或 分:秒');inp.placeholder='5.2 或 1:23.5';
+ tc.appendChild(inp);inp.focus();inp.select();let closed=false;
+ const done=ok=>{if(closed)return;if(ok){const b=parsePos(inp.value);if(b==null){toast(`格式：小节.拍（如 5.2，拍号 ${S.bpb===6?'6/8':S.bpb+'/4'}）或 分:秒（如 1:23.5）`,'err');inp.select();return}seek(b);revealPlayhead()}closed=true;inp.remove();roll.focus({preventScroll:true})};
+ inp.addEventListener('keydown',k=>{k.stopPropagation();if(k.key==='Enter'){k.preventDefault();done(true)}else if(k.key==='Escape'){k.preventDefault();done(false)}});
+ inp.addEventListener('blur',()=>setTimeout(()=>done(false),0));
+}
 
 /* ================= render service ================= */
 const queue=[];let working=null;
@@ -1430,15 +1512,16 @@ function mockRender(req,onProgress,job){return new Promise((res,rej)=>{
  job.abort=()=>{clearInterval(iv);rej(new Error('cancelled'))};})}
 
 /* ================= dialogs, menus, toasts ================= */
-function toast(msg,kind){const t=document.createElement('div');t.className='toast'+(kind==='err'?' err':'');t.textContent=msg;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),kind==='err'?5200:2600)}
+function toast(msg,kind){const t=document.createElement('div');t.className='toast'+(kind==='err'?' err':'');t.textContent=msg;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),kind==='err'||msg.length>40?5200:2600)}
 function dialog(title,body,foot,mount,dopt={}){const o=$('#overlay');o.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-label="${esc(title)}"${dopt.modal?' data-modal="1"':''}><header><h2>${esc(title)}</h2>${dopt.modal?'':`<button class="btn icon" data-close title="关闭">${icon('x')}</button>`}</header><div class="body">${body}</div>${foot?`<footer>${foot}</footer>`:''}</div>`;o.hidden=false;mount&&mount(o);const f=o.querySelector('input,textarea,select,button.primary');f&&f.focus()}
 function closeDialog(){$('#overlay').hidden=true;$('#overlay').innerHTML=''}
 $('#overlay').addEventListener('click',e=>{if(e.target.closest('[data-close]')||(e.target.id==='overlay'&&!$('#overlay [data-modal]')))closeDialog()});
 const MENUS={
  file:[['新建空白工程',DESK?'Ctrl+N':'',()=>newProject()],['打开工程文件…','Ctrl+O',()=>openProject()],...(DESK?[['保存','Ctrl+S',()=>saveProject(false)],['另存为…','Ctrl+Shift+S',()=>saveProject(true)]]:[]),0,
-  ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};renderAll();toast('已载入示例')}],0,
-  ['导入乐谱…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
- edit:[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending]],
+  ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};S.refF0=null;renderAll();toast('已载入示例')}],0,
+  ['导入乐谱 / 转写 JSON…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
+ edit:()=>[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending],0,
+  ['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
  help:[['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
 let openMenu=null;
 // items: [label, shortcut, action, disabled] or 0 for a separator
@@ -1451,10 +1534,10 @@ function popMenu(items,x,y){if(openMenu){openMenu.remove();openMenu=null}
 }
 document.addEventListener('click',e=>{const mb=e.target.closest('[data-menu]');
  if(openMenu&&!e.target.closest('.menu')){openMenu.remove();openMenu=null;if(!mb)return}
- if(mb){const r=mb.getBoundingClientRect();popMenu(MENUS[mb.dataset.menu],r.left,r.bottom+4)}
+ if(mb){const r=mb.getBoundingClientRect(),m=MENUS[mb.dataset.menu];popMenu(typeof m==='function'?m():m,r.left,r.bottom+4)}
 });
 function confirmDlg(t,msg,ok,fn){dialog(t,`<p style="margin:0;line-height:1.6">${esc(msg)}</p>`,`<button class="btn line" data-close>取消</button><button class="btn primary" id="cfOk">${esc(ok)}</button>`,o=>o.querySelector('#cfOk').onclick=()=>{closeDialog();fn()})}
-function kbDlg(){const K=[['播放 / 暂停','Space'],['停止并回到开头','Esc'],['回到开头 / 结尾','Home / End'],['选择 / 铅笔 / 橡皮','V / B / E'],['选中前一个 / 后一个','← / →'],['音高 ±1 半音','↑ / ↓'],['音高 ±1 八度','Shift + ↑ / ↓'],['缩短 / 延长时值','[ / ]'],['编辑歌词（Tab 跳到下一个）','Enter / 双击'],['插入音符 / 休止 / 连音','N / R / M'],['删除选中','Delete / Backspace'],['删除并保留空位（改为休止）','Shift+Delete'],['框选多个（Shift/Ctrl 追加）','在空白处拖动'],['连续删除','橡皮工具拖过音符'],['删除整句、更多操作','右键音符或乐句条'],['撤销 / 重做','Ctrl+Z / Ctrl+Shift+Z'],['全选','Ctrl+A'],['渲染未渲染乐句','Ctrl+R'],['横向缩放 / 纵向缩放','Ctrl+滚轮 / Alt+滚轮'],['自由定位播放头','按住 Alt 点标尺']];
+function kbDlg(){const K=[['播放 / 停止','Space'],['从选中音符开始播放','Shift+Space'],['停止并回到开头','Esc'],['回到开头 / 结尾','Home / End'],['移动播放头','单击或拖动标尺；单击卷帘空白处'],['从某处开始播放','双击标尺'],['跳到指定位置','单击时间码 / Ctrl+G'],['播放头前后一拍 / 一小节',', . / Shift + , .'],['上一句 / 下一句开头','Ctrl+← / Ctrl+→'],['播放头移到选中音符','L'],['定位时不吸附','按住 Alt'],['选择 / 铅笔 / 橡皮','V / B / E'],['选中前一个 / 后一个','← / →'],['音高 ±1 半音','↑ / ↓'],['音高 ±1 八度','Shift + ↑ / ↓'],['缩短 / 延长时值','[ / ]'],['编辑歌词（Tab 跳到下一个）','Enter / 双击'],['插入音符 / 休止 / 连音','N / R / M'],['删除选中','Delete / Backspace'],['删除并保留空位（改为休止）','Shift+Delete'],['框选多个（Shift/Ctrl 追加）','在空白处拖动'],['连续删除','橡皮工具拖过音符'],['删除整句、更多操作','右键音符或乐句条'],['撤销 / 重做','Ctrl+Z / Ctrl+Shift+Z'],['全选','Ctrl+A'],['渲染未渲染乐句','Ctrl+R'],['横向缩放 / 纵向缩放','Ctrl+滚轮 / Alt+滚轮']];
  dialog('快捷键',`<div class="kb-grid">${K.map(([a,b])=>`<span>${a}</span><kbd>${b}</kbd>`).join('')}</div>`)}
 function aboutDlg(){dialog('关于 VocalRender',`<div style="line-height:1.75;font-size:13px">${DESK?`<p style="margin-top:0"><b>VocalRender Studio 桌面版 v${esc(DESK.info.version||'')}</b></p>`:''}
  <p style="margin-top:0">VocalRender 是乐谱原生（score-native）的歌声合成模型：直接读取歌词、MIDI 音高、音符时值和全局速度，生成 48 kHz 歌声，不需要逐音素时长或对齐好的参考音频。</p>
@@ -1471,18 +1554,125 @@ function settingsDlg(){const s=S.service;
   const apply=()=>{s.mode=mode;s.base=o.querySelector('#sBase').value.trim();s.key=o.querySelector('#sKey').value};
   o.querySelector('#sTest').onclick=async()=>{const old={...s};apply();try{toast(await Client.health())}catch(e){toast('连接失败：'+e.message,'err')}Object.assign(s,old)};
   o.querySelector('#sSave').onclick=()=>{apply();closeDialog();renderAll();toast(s.mode==='demo'?'已切换到演示服务':'已切换到远程服务')}})}
-function importDlg(){
- dialog('导入乐谱',`<div class="segs" style="margin-bottom:14px"><button data-it="json" class="on">VocalRender JSON</button><button data-it="xml">MusicXML</button><button data-it="abc">ABC 记谱</button></div>
+// ---- Timed transcriptions: text / note_pitch / note_type / duration (seconds), optional time [ms] and f0 ----
+function asList(v){return Array.isArray(v)?v.map(String):String(v==null?'':v).trim().split(/\s+/).filter(Boolean)}
+function isTranscript(d){const a=Array.isArray(d)?d:[d];return a.length>0&&a.every(x=>x&&typeof x==='object'&&x.text!=null&&x.duration!=null&&x.note_pitch!=null)}
+function isLabel(d){const x=Array.isArray(d)?d[0]:d;return!!(x&&Array.isArray(x.word)&&Array.isArray(x.pitch)&&Array.isArray(x.note))}
+function parseTranscript(d){const a=Array.isArray(d)?d:[d];let clock=0;
+ const segs=a.map((x,k)=>{const text=asList(x.text),dur=asList(x.duration).map(Number),pitch=asList(x.note_pitch).map(Number),type=x.note_type!=null?asList(x.note_type):null,n=text.length;
+  if(!n)throw new Error(`第 ${k+1} 段没有歌词（text 为空）`);
+  if(dur.length!==n||pitch.length!==n||(type&&type.length!==n))throw new Error(`第 ${k+1} 段的 text、duration、note_pitch${type?'、note_type':''} 个数不一致（${n} / ${dur.length} / ${pitch.length}${type?' / '+type.length:''}）`);
+  if(dur.some(v=>!(v>=0)))throw new Error(`第 ${k+1} 段的 duration 里有不是数字的值`);
+  const total=dur.reduce((t,v)=>t+v,0),start=Array.isArray(x.time)&&isFinite(x.time[0])?x.time[0]/1000:clock;clock=start+total;
+  const notes=text.map((w,i)=>{const bare=w.replace(/^<|>$/g,''),br=/^(AP|br|breath)$/i.test(bare),rest=!br&&(/^(SP|sil|pau|rest)$/i.test(bare)||(type?type[i]==='1':false)||!(pitch[i]>0));
+   return{w:bare,d:dur[i],p:Math.round(pitch[i]),kind:br?'breath':rest?'rest':'note',slur:type?type[i]==='3':bare==='-'}});
+  const f0=x.f0!=null?asList(x.f0).map(Number):null;
+  return{name:String(x.index||x.item_name||x.name||`片段 ${k+1}`),lang:String(x.language||''),start,total,notes,f0,f0hop:f0&&f0.length?total/f0.length:null,
+   count:notes.filter(q=>q.kind==='note').length}});
+ return segs.sort((p,q)=>p.start-q.start);
+}
+// Tempo: the BPM whose 1/16 grid the note onsets cluster on most tightly (vector strength over 50–180 BPM)
+function estimateBpm(segs){const on=[];segs.forEach(s=>{let t=s.start;s.notes.forEach(n=>{if(n.kind==='note')on.push(t);t+=n.d})});
+ if(on.length<4)return 90;let best=90,bv=-1;
+ for(let b=50;b<=180;b++){const G=60/b/4;let c=0,sn=0;on.forEach(t=>{const a=2*Math.PI*t/G;c+=Math.cos(a);sn+=Math.sin(a)});const v=Math.hypot(c,sn)/on.length;if(v>bv){bv=v;best=b}}
+ return best}
+// Note values in 32nds and their NV index (the dotted 32nd does not fall on a 32nd grid)
+const Q32=[1,2,3,4,6,8,12,16,24,32,48],Q32IDX={1:0,2:2,3:3,4:4,6:5,8:6,12:7,16:8,24:9,32:10,48:11};
+function splitDur(n){const out=[];while(n>0){let r=1;for(const q of Q32)if(q<=n)r=q;out.push(r);n-=r}return out}
+// Snap every onset to the grid (so timing never drifts), turn the gaps between onsets into note values;
+// a length no single value can express becomes a tie (same pitch, "-"), gaps between segments become rests.
+function quantizeTranscript(segs,bpm,grid){
+ const s32=60/bpm/8,tl=[];let cur=null;
+ segs.forEach(sg=>{let t=sg.start;if(cur!=null){if(t>cur+.02)tl.push({kind:'rest',w:'SP',p:0,t:cur});else t=Math.max(t,cur)}
+  sg.notes.forEach(n=>{tl.push({...n,t});t+=n.d});cur=t});
+ const T0=tl.length?tl[0].t:0;tl.push({end:true,t:cur});
+ const events=[],map=[],errs=[];let pos=0,ties=0,prevNote=false;
+ for(let i=0;i<tl.length-1;i++){const n=tl[i],isNote=n.kind==='note';let L=Math.round((tl[i+1].t-T0)/s32/grid)*grid-pos;
+  if(isNote&&L<1)L=1;if(L<=0)continue;
+  if(isNote&&!Q32.includes(L)){const near=Q32.reduce((a,q)=>Math.abs(q-L)<Math.abs(a-L)?q:a);if(L>=3&&Math.abs(near-L)<=1)L=near}
+  const parts=splitDur(L);map.push([n.t,pos/8]);
+  if(isNote){errs.push(Math.abs(pos*s32-(n.t-T0)));if(parts.length>1)ties++}
+  parts.forEach((q,k)=>{const dur=Q32IDX[q];
+   if(n.kind==='rest')events.push({id:uid(),kind:'rest',word:'SP',pitch:0,dur});
+   else if(n.kind==='breath')events.push({id:uid(),kind:'breath',word:'AP',pitch:0,dur});
+   else events.push({id:uid(),kind:'note',word:k>0||(n.slur&&prevNote)?'-':n.w,pitch:Math.max(MINP,Math.min(MAXP,n.p)),dur})});
+  prevNote=isNote;pos+=L}
+ map.push([cur,pos/8]);errs.sort((a,b)=>a-b);
+ // phrases (split at rests) over the per-request limits
+ let over=0,ev=0,un=0;const flush=()=>{if(ev>LIMIT_EVENTS||un>LIMIT_UNITS)over++;ev=0;un=0};
+ events.forEach(e=>{if(e.kind==='rest'){if(ev){ev++;un++;flush()}}else{ev++;if(e.word!=='-')un++}});if(ev)flush();
+ return{events,map,ties,over,median:errs.length?errs[errs.length>>1]:0,p90:errs.length?errs[Math.floor(errs.length*.9)]:0,beats:pos/8,notes:errs.length}}
+// The original singer's f0 placed on the quantized timeline (time -> beat, piecewise linear between onsets)
+function buildRef(segs,map){if(!segs.some(s=>s.f0&&s.f0.length))return null;const b=[],m=[];let j=0;
+ const at=t=>{while(j<map.length-2&&map[j+1][0]<=t)j++;const[a0,b0]=map[j],[a1,b1]=map[Math.min(j+1,map.length-1)];return a1>a0?b0+(Math.min(Math.max(t,a0),a1)-a0)/(a1-a0)*(b1-b0):b0};
+ segs.forEach(s=>{if(!s.f0)return;j=0;s.f0.forEach((hz,k)=>{b.push(+at(s.start+k*s.f0hop).toFixed(3));m.push(hz>0?+(69+12*Math.log2(hz/440)).toFixed(2):null)});b.push(b[b.length-1]);m.push(null)});
+ return{b,m}}
+// After an import: name a built-in voice whose range covers clearly more of the melody than the current one
+function rangeHint(){const ps=S.events.filter(e=>e.kind==='note').map(e=>e.pitch);if(!ps.length)return '';
+ const fit=v=>ps.filter(p=>p>=v.range[0]&&p<=v.range[1]).length/ps.length,cur=voiceObj(),best=VOICES.reduce((a,v)=>fit(v)>fit(a)?v:a,VOICES[0]);
+ const out=Math.round((1-fit(cur))*ps.length);
+ return best.id!==cur.id&&fit(best)>fit(cur)&&out>ps.length*.05?`。有 ${out} 个音超出 ${cur.name} 的音域，旋律在 ${pname(Math.min(...ps))}–${pname(Math.max(...ps))}，${best.name} 的音域更合适，可在左侧切换`:''}
+function songName(segs){const n=segs[0]&&segs[0].name||'';return n.replace(/(_\d+){1,2}$/,'')||n}
+function importDlg(prefill){
+ dialog('导入乐谱',`<div class="segs" style="margin-bottom:14px"><button data-it="json" class="on">JSON</button><button data-it="xml">MusicXML</button><button data-it="abc">ABC 记谱</button></div>
  <div id="impBody"></div>`,`<button class="btn line" data-close>取消</button><button class="btn primary" id="impGo">导入</button>`,o=>{
-  let type='json';const body=o.querySelector('#impBody');
-  const draw=()=>{body.innerHTML=type==='json'?`<p class="hint" style="margin:0 0 8px">粘贴标注 JSON（单条或数组）。需要 word、pitch、note、pitch2word、bpm 字段。</p><textarea id="impText" spellcheck="false" placeholder='{"word":["感","受","SP"],"pitch":[62,62,0],"note":["<NOTE_8>","<NOTE_DOT_16>","<NOTE_8>"],"pitch2word":[0,1,2],"bpm":90}'></textarea>`
+  let type='json',parsed=null,t=null;const body=o.querySelector('#impBody'),go=o.querySelector('#impGo');
+  const st={sel:null,bpm:90,auto:90,grid:1,ref:true};
+  const draw=()=>{parsed=null;go.textContent='导入';body.innerHTML=type==='json'?`<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="hint">支持 VocalRender 标注（word / pitch / note / pitch2word / bpm），以及带时长的歌唱转写（text / note_pitch / note_type / duration 秒，可带 time 和 f0）。</span><label class="btn line" for="impJsonFile" style="flex:none">选择文件…</label><input type="file" id="impJsonFile" accept=".json,.txt" hidden></div><textarea id="impText" spellcheck="false" placeholder='粘贴 JSON，或点“选择文件…”'></textarea><div id="impPrev" style="margin-top:12px"></div>`
    :type==='xml'?`<label class="drop" for="impFile">选择 .musicxml / .xml / .mxl 文件</label><input type="file" id="impFile" accept=".musicxml,.xml,.mxl" hidden><p class="hint" style="margin-top:10px">由服务端 <span class="mono">POST /score/import</span> 解析：自动选择带歌词的单声部，可指定小节范围；非标准时值误差 ≤12.5% 时量化并提示，和弦与重叠声部会报出位置。</p>`
-   :`<textarea id="impText" spellcheck="false" placeholder="X:1&#10;L:1/8&#10;Q:1/4=90&#10;K:C&#10;E G A2 G E D2 |&#10;w: 晚 风 吹 过 旧 街"></textarea><p class="hint">由服务端 <span class="mono">POST /score/import</span> 解析，小写 w: 行作为对齐歌词，下划线 _ 表示连音。</p>`};
+   :`<textarea id="impText" spellcheck="false" placeholder="X:1&#10;L:1/8&#10;Q:1/4=90&#10;K:C&#10;E G A2 G E D2 |&#10;w: 晚 风 吹 过 旧 街"></textarea><p class="hint">由服务端 <span class="mono">POST /score/import</span> 解析，小写 w: 行作为对齐歌词，下划线 _ 表示连音。</p>`;
+   if(type==='json'){const ta=o.querySelector('#impText');ta.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(analyse,250)});
+    o.querySelector('#impJsonFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;ta.value=await f.text();analyse()});
+    if(prefill){ta.value=prefill;prefill=null;analyse()}}};
+  const prev=()=>o.querySelector('#impPrev');
+  function analyse(){const txt=o.querySelector('#impText').value.trim();parsed=null;go.textContent='导入';if(!txt){prev().innerHTML='';return}
+   let d;try{d=JSON.parse(txt)}catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">不是有效的 JSON：${esc(e.message)}</p>`;return}
+   try{
+    if(isTranscript(d)){const segs=parseTranscript(d);st.sel=new Set(segs.map((_,i)=>i));st.auto=st.bpm=estimateBpm(segs);parsed={kind:'transcript',segs};showTranscript()}
+    else if(isLabel(d)){const x=Array.isArray(d)?d[0]:d,ev=fromLabel(x);parsed={kind:'label',x,ev};prev().innerHTML=`<div class="card imp-stats">识别为 <b>VocalRender 标注</b>${Array.isArray(d)&&d.length>1?`（共 ${d.length} 条，导入第一条）`:''} · ${ev.length} 个事件 · ${x.bpm||S.bpm} BPM</div>`}
+    else prev().innerHTML='<p class="hint" style="color:var(--err)">没认出这个 JSON 的格式。需要 word / pitch / note / pitch2word，或 text / note_pitch / duration 字段。</p>'}
+   catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">${esc(e.message)}</p>`}}
+  function showTranscript(){const segs=parsed.segs,hasTime=segs.some(s=>s.start>0),hasF0=segs.some(s=>s.f0&&s.f0.length),langs=[...new Set(segs.map(s=>s.lang).filter(Boolean))];
+   const foreign=langs.filter(l=>!/mandarin|chinese|zh|cmn|中文|普通话|汉语/i.test(l));
+   prev().innerHTML=`<div class="imp-stats">识别为 <b>带时长的歌唱转写</b> · ${segs.length} 个片段${hasF0?` · 含原唱音高（每 ${Math.round(segs.find(s=>s.f0).f0hop*1000)} ms 一个点）`:''}</div>
+    <div class="imp-segs">${segs.map((s,i)=>`<label class="imp-seg"><input type="checkbox" data-seg="${i}" ${st.sel.has(i)?'checked':''}><span class="nm">${esc(s.name)}</span><span class="t">${hasTime?fmtTime(s.start).slice(0,8)+' · ':''}${s.total.toFixed(1)} 秒 · ${s.count} 个音</span></label>`).join('')}</div>
+    <div class="row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+     <div class="fld" style="margin:0"><label for="impBpm">速度 BPM <span class="hint">（自动检测 ${st.auto}）</span></label><div class="row"><input class="inp mono" id="impBpm" type="number" min="40" max="240" value="${st.bpm}" style="width:90px"><button class="btn line" id="impAuto" ${st.bpm===st.auto?'disabled':''}>恢复检测值</button></div></div>
+     <div class="fld" style="margin:0"><div class="lab">量化网格</div><div class="segs" id="impGrid"><button data-g="1" class="${st.grid===1?'on':''}" title="起音更贴近原唱">1/32 更准</button><button data-g="2" class="${st.grid===2?'on':''}" title="音符更规整，起音偏差更大">1/16 更规整</button></div></div>
+    </div>
+    ${hasF0?`<label class="row" style="gap:8px;font-size:12.5px;margin-bottom:10px"><input type="checkbox" id="impRef" ${st.ref?'checked':''}> 导入原唱音高，在卷帘上显示为灰色参考线</label>`:''}
+    <div class="card imp-stats" id="impStats"></div>
+    ${foreign.length?`<p class="hint" style="color:var(--warn);margin-top:8px">语言为 ${esc(foreign.join('、'))}：当前模型只支持中文歌词，导入后非中文的字会标为错误。</p>`:''}`;
+   prev().querySelectorAll('[data-seg]').forEach(c=>c.onchange=()=>{c.checked?st.sel.add(+c.dataset.seg):st.sel.delete(+c.dataset.seg);stats()});
+   const bi=prev().querySelector('#impBpm');bi.oninput=()=>{const v=Math.round(+bi.value);if(v>=40&&v<=240){st.bpm=v;prev().querySelector('#impAuto').disabled=v===st.auto;stats()}};
+   prev().querySelector('#impAuto').onclick=()=>{st.bpm=st.auto;bi.value=st.auto;prev().querySelector('#impAuto').disabled=true;stats()};
+   prev().querySelectorAll('#impGrid button').forEach(b=>b.onclick=()=>{st.grid=+b.dataset.g;prev().querySelectorAll('#impGrid button').forEach(x=>x.classList.toggle('on',x===b));stats()});
+   const rc=prev().querySelector('#impRef');if(rc)rc.onchange=()=>{st.ref=rc.checked};
+   stats()}
+  function chosen(){return parsed.segs.filter((_,i)=>st.sel.has(i))}
+  function stats(){const segs=chosen(),box=prev().querySelector('#impStats');if(!segs.length){box.innerHTML='至少选一个片段';go.disabled=true;return}go.disabled=false;
+   const q=quantizeTranscript(segs,st.bpm,st.grid);parsed.q=q;
+   box.innerHTML=`将生成 <b>${q.events.length}</b> 个事件（${q.notes} 个音符），共 ${Math.ceil(q.beats/S.bpb)} 小节 · ${fmtTime(q.beats*60/st.bpm).slice(0,5)}<br>
+    起音和原唱的偏差：中位数 <b>${Math.round(q.median*1000)} ms</b>，90% 在 ${Math.round(q.p90*1000)} ms 以内${q.ties?` · ${q.ties} 个长音写成同音连音`:''}
+    ${q.over?`<br><span style="color:var(--warn)">${q.over} 个乐句超过单次渲染上限，导入后会标出，可插入休止拆开。</span>`:''}`;
+   go.textContent=segs.length>1?`导入 ${segs.length} 个片段`:'导入'}
   draw();o.querySelectorAll('[data-it]').forEach(b=>b.onclick=()=>{type=b.dataset.it;o.querySelectorAll('[data-it]').forEach(x=>x.classList.toggle('on',x===b));draw()});
-  o.querySelector('#impGo').onclick=()=>{
-   if(type!=='json'){toast(S.service.mode==='demo'?'演示模式不解析 MusicXML / ABC，连接服务后可用。可以先粘贴 VocalRender JSON。':'已提交到 /score/import',S.service.mode==='demo'?'err':undefined);return}
-   try{let d=JSON.parse(o.querySelector('#impText').value);if(Array.isArray(d))d=d[0];const ev=fromLabel(d);commit(()=>{S.events=ev;S.bpm=+d.bpm||S.bpm;$('#bpm').value=S.bpm;S.sel.clear()});closeDialog();toast(`已导入 ${ev.length} 个事件`)}
-   catch(e){toast('无法导入：'+e.message,'err')}}})}
+  go.onclick=()=>{
+   if(type!=='json'){toast(S.service.mode==='demo'?'演示模式不解析 MusicXML / ABC，连接服务后可用。可以先导入 JSON。':'已提交到 /score/import',S.service.mode==='demo'?'err':undefined);return}
+   if(!parsed){analyse();if(!parsed)return toast('先粘贴或选择一个能识别的 JSON','err')}
+   if(parsed.kind==='label'){const{x,ev}=parsed;commit(()=>{S.events=ev;S.bpm=+x.bpm||S.bpm;$('#bpm').value=S.bpm;S.sel.clear()});S.refF0=null;closeDialog();toast(`已导入 ${ev.length} 个事件`);return}
+   const segs=chosen();if(!segs.length)return;const q=parsed.q||quantizeTranscript(segs,st.bpm,st.grid);
+   if(audio.playing)pause();
+   commit(()=>{S.events=q.events;S.bpm=st.bpm;S.sel.clear();S.curPhrase=null});
+   S.refF0=st.ref?buildRef(segs,q.map):null;S.name=songName(segs)||S.name;$('#projName').value=S.name;$('#bpm').value=S.bpm;
+   closeDialog();setPlayhead(0);renderAll();roll.scrollLeft=0;
+   const ps=S.events.filter(e=>e.kind==='note').map(e=>e.pitch);if(ps.length)roll.scrollTop=(MAXP-ps.reduce((a,b)=>a+b)/ps.length)*S.rowH-roll.clientHeight/2;
+   toast(`已导入 ${q.notes} 个音符 · ${S.bpm} BPM${S.refF0?' · 灰线是原唱音高':''}，可用 Ctrl+Z 撤销${rangeHint()}`)};
+ })}
+// Files opened or dropped: a project, or a score to import
+function openJSONText(text,ref,fname){let d;try{d=JSON.parse(text)}catch(e){throw new Error('文件不是有效的 JSON')}
+ if(isTranscript(d)||isLabel(d)){importDlg(text);return}
+ loadProject(d,ref);toast('已打开 '+fname)}
 function fromLabel(d){
  ['word','pitch','note','pitch2word'].forEach(k=>{if(!Array.isArray(d[k]))throw new Error(`缺少 ${k} 字段`)});
  if(d.pitch.length!==d.note.length||d.pitch.length!==d.pitch2word.length)throw new Error('pitch、note、pitch2word 长度不一致');
@@ -1546,7 +1736,7 @@ function http(url,init={}){
 }
 function projectData(){const renders={};Object.entries(S.renders).forEach(([k,r])=>{if(r.takes.length)renders[k]={takes:r.takes.map(t=>({...t,buffer:undefined})),active:r.active,job:null}});
  const customVoices=S.customVoices.filter(v=>v._b64||v.buffer).map(v=>({id:v.id,name:v.name,dur:+(+v.dur).toFixed(3),sr:v.sr,ch:v.ch,consent:!!v.consent,wav:voiceB64(v)}));
- return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,customVoices,renders}}
+ return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,customVoices,refF0:S.refF0||null,renders}}
 const projectJSON=()=>JSON.stringify(projectData());
 const isDirty=()=>!!fileRef&&savedJSON!==projectJSON();
 function updateTitle(){if(!DESK)return;document.title=(isDirty()?'● ':'')+(fileRef?fileRef.name.replace(/\.vrproj$/i,''):S.name)+' - VocalRender Studio'}
@@ -1555,7 +1745,7 @@ function loadProject(o,ref){
  if(audio.playing)pause();queue.length=0;
  if(Array.isArray(o.customVoices))restoreVoices(o.customVoices);
  Object.assign(S,{name:o.name||'未命名工程',bpm:+o.bpm||90,bpb:+o.bpb||4,events:o.events.map(e=>({...e,id:e.id||uid()})),voice:[...VOICES,...S.customVoices].some(v=>v.id===o.voice)?o.voice:'Alto-1',ckpt:o.ckpt||'VocalRender-Pro',renders:o.renders||{}});
- Object.values(S.renders).forEach(r=>r.job=null);if(o.gen)Object.assign(S.gen,o.gen);
+ Object.values(S.renders).forEach(r=>r.job=null);if(o.gen)Object.assign(S.gen,o.gen);S.refF0=o.refF0||null;
  S.sel.clear();S.curPhrase=null;S.playhead=0;hist=[];redo=[];perfCache.clear();
  $('#bpm').value=S.bpm;$('#bpb').value=S.bpb;$('#ckpt').value=S.ckpt;$('#projName').value=S.name;
  fileRef=ref||null;renderVoices();renderAll();savedJSON=fileRef?projectJSON():null;updateTitle();
@@ -1568,14 +1758,14 @@ async function saveProject(as){
 }
 async function openProject(){
  if(!DESK){$('#projFile').click();return}
- try{const r=await DESK.openFile();if(!r)return;loadProject(JSON.parse(r.text),{path:r.path,name:r.name});toast('已打开 '+r.name)}
+ try{const r=await DESK.openFile();if(!r)return;openJSONText(r.text,{path:r.path,name:r.name},r.name)}
  catch(e){toast('无法打开：'+e.message,'err')}
 }
 function newProject(){confirmDlg('新建空白工程','当前乐谱和渲染版本会被清空。确定继续吗？','新建',()=>{loadProject({events:[],name:'未命名工程',bpm:S.bpm,bpb:S.bpb,voice:S.voice,ckpt:S.ckpt},null)})}
-$('#projFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{loadProject(JSON.parse(await f.text()),null);toast('已打开 '+f.name)}catch(err){toast('无法打开：'+err.message,'err')}});
+$('#projFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{openJSONText(await f.text(),null,f.name)}catch(err){toast('无法打开：'+err.message,'err')}});
 document.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault()});
 document.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files[0];if(!f||e.defaultPrevented)return;e.preventDefault();
- if(/\.(vrproj|json)$/i.test(f.name)){f.text().then(t=>{const p=DESK&&DESK.pathForFile?DESK.pathForFile(f):null;loadProject(JSON.parse(t),p?{path:p,name:f.name}:null);toast('已打开 '+f.name)}).catch(err=>toast('无法打开：'+err.message,'err'))}
+ if(/\.(vrproj|json|txt)$/i.test(f.name)){f.text().then(t=>{const p=DESK&&DESK.pathForFile?DESK.pathForFile(f):null;openJSONText(t,p?{path:p,name:f.name}:null,f.name)}).catch(err=>toast('无法打开：'+err.message,'err'))}
  else toast('拖入 .vrproj 打开工程；参考音频拖到左侧声线区，伴奏拖到伴奏轨')});
 // File shortcuts work even while typing in a field, like other Windows editors
 document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||e.altKey||!$('#overlay').hidden)return;const k=e.key.toLowerCase();
@@ -1592,7 +1782,7 @@ if(DESK){
    o.querySelector('#cNo').onclick=()=>{closeDialog();res(true)};
    o.querySelector('#cCancel').onclick=()=>{closeDialog();res(false)}},{modal:true});
  }));
- if(DESK.onOpenFile)DESK.onOpenFile(r=>{try{loadProject(JSON.parse(r.text),{path:r.path,name:r.name});toast('已打开 '+r.name)}catch(e){toast('无法打开 '+r.name+'：'+e.message,'err')}});
+ if(DESK.onOpenFile)DESK.onOpenFile(r=>{try{openJSONText(r.text,{path:r.path,name:r.name},r.name)}catch(e){toast('无法打开 '+r.name+'：'+e.message,'err')}});
  if(DESK.onAccentChange)DESK.onAccentChange(h=>{window.__vrAccent&&window.__vrAccent(h);perfCache.clear();renderAll();renderVoices()});
  updateTitle();
 }
@@ -1622,7 +1812,18 @@ function encodeWav(buf,bits){
 /* ================= wiring ================= */
 function setTool(t){S.tool=t;$$('[data-tool]').forEach(b=>b.classList.toggle('on',b.dataset.tool===t));content.style.cursor=t==='pencil'?'crosshair':t==='eraser'?'cell':'default'}
 $$('[data-tool]').forEach(b=>{b.innerHTML=icon(b.dataset.tool);b.onclick=()=>setTool(b.dataset.tool)});
-$('#btnPlay').onclick=()=>audio.playing?pause():play();
+$('#btnPlay').onclick=togglePlay;
+function syncToggles(){
+ const r=$('#btnReturn'),f=$('#btnFollow');r.innerHTML=icon('ret');f.innerHTML=icon('follow');
+ r.classList.toggle('on',PREFS.returnOnStop);r.setAttribute('aria-pressed',PREFS.returnOnStop);r.title=`停止后回到起点：${PREFS.returnOnStop?'开':'关'}\n开：按空格停止时，播放头回到这次开始播放的位置，方便反复试听同一段`;
+ f.classList.toggle('on',PREFS.follow);f.setAttribute('aria-pressed',PREFS.follow);f.title=`跟随播放：${PREFS.follow?'开':'关'}\n开：播放头走到右边缘时卷帘自动翻页`;
+ const rb=$('#btnRef');rb.innerHTML=icon('wave')+'原唱参考';rb.classList.toggle('on',PREFS.showRef)}
+$('#btnReturn').onclick=()=>{PREFS.returnOnStop=!PREFS.returnOnStop;savePrefs();syncToggles();renderRuler()};
+$('#btnFollow').onclick=()=>{PREFS.follow=!PREFS.follow;savePrefs();syncToggles()};
+$('#btnRef').onclick=()=>{PREFS.showRef=!PREFS.showRef;savePrefs();syncToggles();renderRoll()};
+$('#tc').addEventListener('click',e=>{if(!e.target.closest('input'))gotoPos()});
+$('#tc').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.id==='tc'){e.preventDefault();gotoPos()}});
+syncToggles();
 $('#btnStop').innerHTML=icon('stop');$('#btnStop').onclick=stop;
 $('#btnHome').innerHTML=icon('home');$('#btnHome').onclick=()=>seek(0);
 $('#btnUndo').innerHTML=icon('undo');$('#btnUndo').onclick=undo;
@@ -1696,8 +1897,13 @@ $('#status').addEventListener('click',e=>{if(!e.target.closest('#stIssues'))retu
  dialog(`检查结果（${D.issues.length}）`,D.issues.map((x,k)=>`<button class="issue ${x.lv}" data-iss="${k}"><span class="ic"></span><span>${esc(x.msg)}</span></button>`).join(''),null,o=>{
   o.querySelectorAll('[data-iss]').forEach(b=>b.onclick=()=>{const x=D.issues[+b.dataset.iss];closeDialog();if(x.i!=null){S.sel=new Set([S.events[x.i].id]);S.tab='props';renderAll();scrollToIdx(x.i)}else if(x.key)selectPhrase(x.key,false)})})});
 
+// A button clicked with the mouse gives its focus back, so Space keeps meaning play/stop (as in audio editors)
+// instead of pressing that button again. Buttons reached with Tab keep focus and still respond to Space/Enter.
+// (capture phase + event path: some buttons redraw their icon on click, which detaches the clicked element)
+document.addEventListener('click',e=>{const b=e.composedPath().find(n=>n.tagName==='BUTTON');if(b&&e.detail>0&&!b.closest('.menu,#overlay')&&document.activeElement===b)b.blur()},true);
 document.addEventListener('keydown',e=>{
  if(!$('#overlay').hidden){if(e.key==='Escape'&&!$('#overlay [data-modal]'))closeDialog();return}
+ if((e.key===' '||e.key==='Enter')&&(e.target.tagName==='BUTTON'||e.target.id==='tc')&&!openMenu)return;
  if(openMenu){if(e.key==='Escape'){e.preventDefault();openMenu.remove();openMenu=null}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const bs=[...openMenu.querySelectorAll('button:not([disabled])')];if(bs.length){const i=bs.indexOf(document.activeElement);bs[(i+(e.key==='ArrowDown'?1:bs.length-1))%bs.length].focus()}}return}
  const tag=(e.target.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select'||e.target.isContentEditable)return;
  const mod=e.ctrlKey||e.metaKey;const k=e.key;
@@ -1707,9 +1913,13 @@ document.addEventListener('keydown',e=>{
  if(mod&&k.toLowerCase()==='r'){e.preventDefault();renderPending();return}
  if(mod&&k.toLowerCase()==='i'){e.preventDefault();importDlg();return}
  if(mod&&k.toLowerCase()==='e'){e.preventDefault();exportDlg();return}
+ if(mod&&k.toLowerCase()==='g'){e.preventDefault();gotoPos();return}
+ if(mod&&(k==='ArrowLeft'||k==='ArrowRight')){e.preventDefault();jumpPhrase(k==='ArrowRight'?1:-1);return}
  if(mod)return;
+ if(e.code==='Comma'||e.code==='Period'){e.preventDefault();nudge(e.code==='Period'?1:-1,e.shiftKey);return}
  switch(k){
-  case ' ':e.preventDefault();audio.playing?pause():play();break;
+  case ' ':e.preventDefault();if(e.shiftKey)playFromSelection();else togglePlay();break;
+  case 'l':case 'L':locateSelection();break;
   case 'Escape':if(openMenu){openMenu.remove();openMenu=null}else if(audio.playing||S.playhead)stop();else{S.sel.clear();renderAll()}break;
   case 'Home':e.preventDefault();seek(0);roll.scrollLeft=0;break;
   case 'End':e.preventDefault();seek(D.total);break;
