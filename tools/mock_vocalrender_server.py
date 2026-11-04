@@ -6,6 +6,11 @@ that follows the submitted score (not real singing). Python standard library onl
 
     python tools/mock_vocalrender_server.py            # http://127.0.0.1:8000/v1
     python tools/mock_vocalrender_server.py --no-f0    # omit f0 so the editor extracts pitch itself
+    python tools/mock_vocalrender_server.py --exact    # follow score timing exactly (the real model does not)
+
+Like the real model, it does not follow the score's timing exactly by default: output starts after a short
+silence, and rests (SP) / breaths (AP) and notes come out somewhat longer or shorter than written.
+Reference audio must be uploaded with POST /voices before its upload_id can be used in /render.
 
 Then in the editor: Settings -> 连接 VocalRender 服务 -> 服务地址 http://127.0.0.1:8000/v1
 """
@@ -31,7 +36,40 @@ SR = 48000
 HOP = 0.01
 
 JOBS = {}
+UPLOADS = {}
 LOCK = threading.Lock()
+
+
+def parse_multipart(body, ctype):
+    """Minimal multipart/form-data parser: returns {field: (filename or None, bytes)}."""
+    m = re.search(r'boundary="?([^";]+)"?', ctype or "")
+    if not m:
+        raise ValueError("expected multipart/form-data with a boundary")
+    sep = b"--" + m.group(1).encode()
+    out = {}
+    for part in body.split(sep)[1:]:
+        if part.startswith(b"--"):
+            break
+        head, _, data = part.lstrip(b"\r\n").partition(b"\r\n\r\n")
+        disp = re.search(rb'name="([^"]*)"(?:; filename="([^"]*)")?', head)
+        if disp:
+            fname = disp.group(2).decode("utf-8", "replace") if disp.group(2) is not None else None
+            out[disp.group(1).decode()] = (fname, data[:-2] if data.endswith(b"\r\n") else data)
+    return out
+
+
+def wav_seconds(data):
+    if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        raise ValueError("reference audio must be a WAV file")
+    pos, fmt = 12, None
+    while pos + 8 <= len(data):
+        cid, size = data[pos:pos + 4], struct.unpack("<I", data[pos + 4:pos + 8])[0]
+        if cid == b"fmt ":
+            fmt = struct.unpack("<HHIIHH", data[pos + 8:pos + 24])
+        elif cid == b"data" and fmt:
+            return min(size, len(data) - pos - 8) / fmt[4] / fmt[2]
+        pos += 8 + size + (size & 1)
+    raise ValueError("WAV file has no audio data")
 
 
 def validate(req):
@@ -50,16 +88,27 @@ def validate(req):
     for w in score["word"]:
         if w not in ("SP", "AP") and not re.fullmatch(r"[㐀-鿿]", w):
             raise ValueError(f"lyric {w!r} is not a single Chinese character")
+    pa = req.get("prompt_audio") or {}
+    if "upload_id" in pa:
+        if pa["upload_id"] not in UPLOADS:
+            raise ValueError(f"unknown upload_id {pa['upload_id']!r}: upload the reference audio with POST /voices first")
+    elif pa.get("preset") not in {v["id"] for v in VOICES}:
+        raise ValueError("prompt_audio needs a preset voice id or an upload_id")
     return score
 
 
-def synthesize(score, seed):
-    """Returns (wav_bytes, f0_hz_list). A buzzy tone with glides and vibrato that follows the score."""
+def synthesize(score, seed, exact=False):
+    """Returns (wav_bytes, f0_hz_list). A buzzy tone with glides and vibrato that follows the score.
+    Unless exact, timing is loosened the way a score-native model sings: a lead-in silence,
+    rests/breaths noticeably shorter or longer, notes a little uneven."""
     rnd = random.Random(seed)
     spb = 60.0 / float(score["bpm"])
-    notes, t = [], 0.0
-    for p, tok in zip(score["pitch"], score["note"]):
+    words = [score["word"][i] for i in score["pitch2word"]]
+    notes, t = [], 0.0 if exact else 0.12 + rnd.random() * 0.1
+    for p, tok, w in zip(score["pitch"], score["note"], words):
         d = NOTE_BEATS[tok.strip("<>")] * spb
+        if not exact:
+            d *= rnd.uniform(0.45, 1.5) if w in ("SP", "AP") else rnd.uniform(0.88, 1.14)
         notes.append((t, t + d, int(p)))
         t += d
     total = t + 0.3
@@ -162,7 +211,19 @@ class Handler(BaseHTTPRequestHandler):
         if self.server.token and self.headers.get("Authorization") != f"Bearer {self.server.token}":
             return self._send(401, {"detail": "invalid token"})
         if r == "/voices":
-            return self._send(200, {"upload_id": "upl_" + uuid.uuid4().hex[:10], "bytes": len(body)})
+            try:
+                parts = parse_multipart(body, self.headers.get("Content-Type"))
+                if "file" not in parts:
+                    raise ValueError("multipart field 'file' is required")
+                secs = wav_seconds(parts["file"][1])
+            except (ValueError, struct.error) as e:
+                return self._send(422, {"detail": str(e)})
+            if secs < 1.5:
+                return self._send(422, {"detail": f"reference audio is {secs:.1f}s; 2-8s of clean singing is needed"})
+            uid = "upl_" + uuid.uuid4().hex[:10]
+            with LOCK:
+                UPLOADS[uid] = {"bytes": len(parts["file"][1]), "seconds": secs}
+            return self._send(200, {"upload_id": uid, "duration_s": round(secs, 2)})
         if r == "/render":
             try:
                 req = json.loads(body or b"{}")
@@ -170,7 +231,7 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, json.JSONDecodeError) as e:
                 return self._send(422, {"detail": str(e)})
             seed = (req.get("generation") or {}).get("seed") or random.randrange(1, 10**9)
-            wav, f0 = synthesize(score, seed)
+            wav, f0 = synthesize(score, seed, self.server.exact)
             job_id = uuid.uuid4().hex[:12]
             with LOCK:
                 JOBS[job_id] = {"created": time.time(), "duration": self.server.delay, "wav": wav, "f0": f0, "seed": seed}
@@ -188,10 +249,11 @@ def main():
     ap.add_argument("--delay", type=float, default=2.0, help="seconds each render job takes")
     ap.add_argument("--token", default="", help="require this Bearer token on POST requests")
     ap.add_argument("--no-f0", action="store_true", help="do not include f0 in job results")
+    ap.add_argument("--exact", action="store_true", help="follow the score timing exactly (no lead-in, no rest/breath stretching)")
     a = ap.parse_args()
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
-    srv.prefix, srv.delay, srv.token, srv.no_f0 = a.prefix.rstrip("/"), a.delay, a.token, a.no_f0
-    print(f"Mock VocalRender service on http://{a.host}:{a.port}{srv.prefix}  (f0 {'off' if a.no_f0 else 'on'})")
+    srv.prefix, srv.delay, srv.token, srv.no_f0, srv.exact = a.prefix.rstrip("/"), a.delay, a.token, a.no_f0, a.exact
+    print(f"Mock VocalRender service on http://{a.host}:{a.port}{srv.prefix}  (f0 {'off' if a.no_f0 else 'on'}, timing {'exact' if a.exact else 'natural'})")
     srv.serve_forever()
 
 

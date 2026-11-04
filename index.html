@@ -186,8 +186,8 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .roll{position:relative;overflow:auto;background:var(--row-w);overscroll-behavior:contain}
 .roll-content{position:relative}
 .outband{position:absolute;left:0;right:0;background:var(--out);pointer-events:none}
-.rest{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 12px);border-left:1px dashed var(--grid-bar);cursor:pointer}
-.rest .rl{position:sticky;top:6px;display:inline-block;margin:6px 0 0 4px;font-size:10px;font-family:var(--f-mono);color:var(--fg-3);background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+.rest{position:absolute;top:0;bottom:0;overflow:hidden;background:repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 12px);border-left:1px dashed var(--grid-bar);cursor:pointer}
+.rest .rl{position:sticky;top:6px;display:inline-block;white-space:nowrap;margin:6px 0 0 4px;font-size:10px;font-family:var(--f-mono);color:var(--fg-3);background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:0 4px}
 .rest.breath{background:repeating-linear-gradient(90deg,var(--hatch) 0 2px,transparent 2px 5px)}
 .rest.sel{background-color:var(--accent-soft);outline:1.5px solid var(--accent);outline-offset:-1.5px}
 .note{position:absolute;border-radius:4px;background:var(--note);color:var(--note-fg);font-size:12px;line-height:1;display:flex;align-items:center;padding-left:5px;overflow:hidden;white-space:nowrap;cursor:ns-resize;user-select:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
@@ -291,6 +291,10 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .menu{position:fixed;z-index:50;min-width:210px;background:var(--raised);border:1px solid var(--line-2);border-radius:8px;box-shadow:var(--shadow);padding:4px}
 .menu button{display:flex;width:100%;justify-content:space-between;gap:20px;align-items:center;border:0;background:transparent;padding:7px 10px;border-radius:5px;text-align:left}
 .menu button:hover{background:var(--accent-soft)}
+.menu button[disabled]{opacity:.4;cursor:default}
+.menu button[disabled]:hover{background:transparent}
+.marquee{position:absolute;z-index:7;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);pointer-events:none;border-radius:2px}
+.note.erasing,.rest.erasing,.nl.erasing{opacity:.2}
 .menu hr{border:0;border-top:1px solid var(--line);margin:4px}
 .overlay{position:fixed;inset:0;z-index:60;background:rgba(10,12,18,.42);display:grid;place-items:center;padding:16px}
 .dlg{width:min(560px,100%);max-height:calc(100% - 32px);overflow:auto;background:var(--panel);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--shadow)}
@@ -418,6 +422,7 @@ html.win11 .drop{border-radius:6px}
 html.win11 .menu{border-radius:8px;background:var(--flyout);border:1px solid var(--line-2);box-shadow:0 8px 16px rgba(0,0,0,.14);-webkit-backdrop-filter:blur(30px) saturate(125%);backdrop-filter:blur(30px) saturate(125%);padding:4px;min-width:250px}
 html.win11 .menu button{border-radius:4px;height:32px;padding:0 12px}
 html.win11 .menu button:hover{background:var(--subtle)}
+html.win11 .menu button[disabled]:hover{background:transparent}
 html.win11 .menu hr{border-top-color:var(--line);margin:4px -4px}
 html.win11 .overlay{background:var(--scrim)}
 html.win11 .dlg{border-radius:8px;background:var(--dialog);border:1px solid var(--line-2);box-shadow:0 32px 64px rgba(0,0,0,.28),0 2px 21px rgba(0,0,0,.22)}
@@ -528,6 +533,7 @@ html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
         <div class="seg">
           <button class="btn icon" id="btnUndo" title="撤销 (Ctrl+Z)"></button>
           <button class="btn icon" id="btnRedo" title="重做 (Ctrl+Shift+Z)"></button>
+          <button class="btn icon" id="btnDel" title="删除选中 (Delete)" disabled></button>
         </div>
         <button class="btn line on" id="btnF0" title="显示渲染结果的实际音高线（F0）"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c2.5 0 3-6 6-6s2.5 5 5 5 2.5-7 7-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>音高线</button>
         <span class="tb-note">时值吸附 12 种音符 · 后续自动顺延</span>
@@ -612,6 +618,7 @@ const ICONS={
  panel:'<rect x="3.5" y="4.5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M14.5 4.5v15" stroke="currentColor" stroke-width="1.8"/>',
  panelL:'<rect x="3.5" y="4.5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 4.5v15" stroke="currentColor" stroke-width="1.8"/>',
  x:'<path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+ trash:'<path d="M4.5 6.5h15M9.5 6.5V4.8c0-.7.5-1.3 1.2-1.3h2.6c.7 0 1.2.6 1.2 1.3v1.7M6.5 6.5l.8 12.2c.1 1 .9 1.8 1.9 1.8h5.6c1 0 1.8-.8 1.9-1.8l.8-12.2M10 10.5v6M14 10.5v6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
  render:'<path d="M4 13v-2M8 17V7M12 20V4M16 16V8M20 13v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'};
 const icon=(n,s=16)=>`<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -621,7 +628,7 @@ const isHan=w=>/^[㐀-鿿]$/.test(w);
 let UID=1; const uid=()=>'e'+(UID++).toString(36)+Math.random().toString(36).slice(2,5);
 function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
-const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
 
 /* ================= state ================= */
 function sampleEvents(){return SAMPLE.map(([w,p,d])=>({id:uid(),kind:w==='SP'?'rest':w==='AP'?'breath':'note',word:w,pitch:p,dur:DC[d]}))}
@@ -638,7 +645,8 @@ const S={
  quickHidden:false, showF0:true};
 const saved=store.get('vrstudio.project');
 if(saved&&Array.isArray(saved.events)&&saved.events.length){
- Object.assign(S,{name:saved.name||S.name,bpm:saved.bpm||90,bpb:saved.bpb||4,events:saved.events,voice:VOICES.some(v=>v.id===saved.voice)?saved.voice:'Alto-1',ckpt:saved.ckpt||S.ckpt});
+ Object.assign(S,{name:saved.name||S.name,bpm:saved.bpm||90,bpb:saved.bpb||4,events:saved.events,voice:(VOICES.some(v=>v.id===saved.voice)||(saved.customVoices||[]).some(v=>v.id===saved.voice))?saved.voice:'Alto-1',ckpt:saved.ckpt||S.ckpt});
+ if(Array.isArray(saved.customVoices))restoreVoices(saved.customVoices);
  if(saved.gen) Object.assign(S.gen,saved.gen);
  if(saved.renders) S.renders=saved.renders;
 }
@@ -682,7 +690,7 @@ function buildScore(p){
 }
 function slug(){const s=S.name.trim();return /^[\w-]+$/.test(s)?s:'proj_'+hashStr(s)}
 function genParams(){const g=S.gen;return{cfg_value:+g.cfg,inference_timesteps:+g.steps,temperature:+g.temp,fsq_temperature:+g.fsq,max_len:+g.maxLen,prompt_max_frames:+g.promptFrames,lyrics_only:!!g.lyricsOnly}}
-function promptAudio(){const v=voiceObj();return v.kind==='preset'?{preset:v.id}:{upload_id:v.uploadId,duration:+v.dur.toFixed(2)}}
+function promptAudio(){const v=voiceObj();if(v.kind==='preset')return{preset:v.id};const base=S.service.base.replace(/\/$/,'');return{upload_id:(v.uploads&&v.uploads[base])||'<渲染时先 POST /voices 上传，填入返回的 upload_id>',duration:+v.dur.toFixed(2)}}
 function phraseHash(p){const r={...p.req};delete r.item_name;return hashStr(JSON.stringify([r,S.voice,S.ckpt,genParams()]))}
 function rec(key){return S.renders[key]||(S.renders[key]={takes:[],active:null,job:null})}
 function activeTake(key){const r=S.renders[key];if(!r||!r.active)return null;return r.takes.find(t=>t.id===r.active)||null}
@@ -745,10 +753,10 @@ function renderRoll(){
  const yTop=(MAXP-v.range[1])*S.rowH,yBot=(MAXP-v.range[0]+1)*S.rowH;
  h+=`<div class="outband" style="top:0;height:${yTop}px"></div><div class="outband" style="top:${yBot}px;bottom:0"></div>`;
  S.events.forEach((e,i)=>{const x=D.starts[i]*S.ppb,w=beats(e)*S.ppb;const sel=S.sel.has(e.id);
-  if(e.kind!=='note'){h+=`<div class="rest${e.kind==='breath'?' breath':''}${sel?' sel':''}" data-i="${i}" style="left:${x}px;width:${w}px"><span class="rl">${e.kind==='breath'?'AP 换气':'SP'}</span></div>`;return}
+  if(e.kind!=='note'){h+=`<div class="rest${e.kind==='breath'?' breath':''}${sel?' sel':''}${erasing(e)?' erasing':''}" data-i="${i}" style="left:${x}px;width:${w}px" title="${e.kind==='breath'?'换气 AP':'休止 SP'} · ${NV[e.dur].n}"><span class="rl">${e.kind==='breath'?(w>=64?'AP 换气':'AP'):'SP'}</span></div>`;return}
   const y=(MAXP-e.pitch)*S.rowH;const mel=e.word==='-';
-  const cls=['note',mel?'mel':'',sel?'sel':'',D.errIdx.has(i)?'err':'',D.warnIdx.has(i)?'warn':''].join(' ');
-  h+=`<div class="${cls}" data-i="${i}" style="left:${x+1}px;top:${y}px;width:${Math.max(4,w-2)}px;height:${S.rowH-1}px" title="${esc(e.word)} · ${pname(e.pitch)} · ${NV[e.dur].n}"><span class="edge"></span></div><span class="nl${mel?' mel':''}${sel?' sel':''}" style="left:${x+3}px;top:${y+2}px;height:${S.rowH-5}px;max-width:${Math.max(0,w-10)}px">${mel?'–':esc(e.word||'?')}</span>`;
+  const cls=['note',mel?'mel':'',sel?'sel':'',erasing(e)?'erasing':'',D.errIdx.has(i)?'err':'',D.warnIdx.has(i)?'warn':''].join(' ');
+  h+=`<div class="${cls}" data-i="${i}" style="left:${x+1}px;top:${y}px;width:${Math.max(4,w-2)}px;height:${S.rowH-1}px" title="${esc(e.word)} · ${pname(e.pitch)} · ${NV[e.dur].n}"><span class="edge"></span></div><span class="nl${mel?' mel':''}${sel?' sel':''}${erasing(e)?' erasing':''}" data-i="${i}" style="left:${x+3}px;top:${y+2}px;height:${S.rowH-5}px;max-width:${Math.max(0,w-10)}px">${mel?'–':esc(e.word||'?')}</span>`;
  });
  if(drag&&drag.mode==='resize'){const i=drag.i,x0=D.starts[i]*S.ppb;
   h+=`<div class="ticks" style="left:${x0}px;top:${(MAXP-S.events[i].pitch)*S.rowH-8}px;width:0">${NV.map((n,k)=>`<i class="${k===S.events[i].dur?'on':''}" style="left:${n.b*S.ppb}px"></i>`).join('')}<b style="left:${NV[S.events[i].dur].b*S.ppb}px">${NV[S.events[i].dur].l}</b></div>`}
@@ -756,6 +764,7 @@ function renderRoll(){
  h+=f0SVG(W,H);
  content.innerHTML=h;
  if(lyrEdit)content.appendChild(lyrEdit.el);
+ if(drag&&drag.mode==='marquee'&&drag.el)content.appendChild(drag.el);
 }
 function renderRuler(){
  const nb=contentBeats(),W=nb*S.ppb;let h='';
@@ -806,20 +815,27 @@ function drawVoiceWave(c,v){
 }
 
 /* ================= pitch (F0) curves ================= */
-// Score snapshot taken when a take is rendered: [startBeat (relative to phrase), beats, pitch, kind 0=rest/breath 1=note 2=melisma, word]
-function snapshotNotes(p){return p.idx.map(i=>{const e=S.events[i];return[+(D.starts[i]-p.start).toFixed(4),NV[e.dur].b,e.kind==='note'?e.pitch:0,e.kind==='note'?(e.word==='-'?2:1):0,e.word]})}
+// Score snapshot taken when a take is rendered: [startBeat (relative to phrase), beats, pitch, kind 0=rest/breath 1=note 2=melisma, word, event id]
+function snapshotNotes(p){return p.idx.map(i=>{const e=S.events[i];return[+(D.starts[i]-p.start).toFixed(4),NV[e.dur].b,e.kind==='note'?e.pitch:0,e.kind==='note'?(e.word==='-'?2:1):0,e.word,e.id]})}
+// Everything the render request described, kept with the take: tempo, the phrase's events (with ids) and the trailing rest sent with it
+function snapshotOf(p){return{bpm:S.bpm,notes:snapshotNotes(p),trail:p.trail!=null?NV[S.events[p.trail].dur].b:0}}
 const perfCache=new Map();
-// Performance of a take: note timing in seconds from phrase start, plus a pitch curve (MIDI float per 10 ms hop, null = unvoiced)
+// Performance of a take: per-note timing in the take's audio (seconds from phrase start) and a pitch curve
+// (MIDI float per hop, null = unvoiced). For service audio the note timing comes from aligning the curve to the score,
+// because the model sings with its own timing: lead-in silence, rests (SP) and breaths (AP) shorter or longer than written.
 function takePerf(t,p){
- if(!t.snap)t.snap={bpm:S.bpm,notes:snapshotNotes(p)};
+ if(!t.snap)t.snap=snapshotOf(p);
  if(perfCache.has(t.id))return perfCache.get(t.id);
- const spb=60/t.snap.bpm,rnd=mulberry((t.seed|0)*7+3),HOP=.01;
- const notes=t.snap.notes.map(([sb,b,pt,k,w])=>({s:sb*spb,e:(sb+b)*spb,p:pt,k,w}));
+ const spb=60/t.snap.bpm,HOP=.01;
+ const notes=t.snap.notes.map(([sb,b,pt,k,w,id])=>({sb,b,p:pt,k,w,id,s:sb*spb,e:(sb+b)*spb}));
+ if(t.f0&&t.f0.vals){const hop=t.f0.hop||HOP,bd=alignToScore(notes,spb,t.f0.vals,hop,t.snap.trail||0);
+  notes.forEach((n,i)=>{n.s=bd[i];n.e=bd[i+1]});
+  const perf={notes,vals:t.f0.vals,hop,bpm:t.snap.bpm};perfCache.set(t.id,perf);return perf}
+ const rnd=mulberry((t.seed|0)*7+3);
  notes.forEach((n,i)=>{if(i>0){const j=(rnd()-.5)*.05;n.s+=j;notes[i-1].e+=j}});
- const total=notes.length?notes[notes.length-1].e:0;let vals;
- if(t.f0&&t.f0.vals){perfCache.set(t.id,{notes,vals:t.f0.vals,hop:t.f0.hop||HOP,bpm:t.snap.bpm});return perfCache.get(t.id)}
+ const total=notes.length?notes[notes.length-1].e:0;
  const vibRate=5.2+rnd()*1.1,vibDepth=.2+rnd()*.18,dr=rnd()*6.28;
- const len=Math.ceil(total/HOP)+1;vals=new Array(len).fill(null);
+ const len=Math.ceil(total/HOP)+1,vals=new Array(len).fill(null);
  notes.forEach((n,i)=>{if(!n.k)return;const prev=notes[i-1],next=notes[i+1];const vp=prev&&prev.k;const dP=vp?n.p-prev.p:0;const dur=n.e-n.s;
   const tr=vp?Math.min(.1,dur*.45)*(n.k===2?.75:1):Math.min(.08,dur*.4);
   const ov=vp?Math.sign(dP)*Math.min(Math.abs(dP),5)/5*.9:0;const fall=!(next&&next.k);
@@ -832,11 +848,50 @@ function takePerf(t,p){
    vals[k]=+v.toFixed(3)}});
  const perf={notes,vals,hop:HOP,bpm:t.snap.bpm};perfCache.set(t.id,perf);return perf;
 }
+// DTW between the score (expected pitch per frame, null for SP/AP) and the measured curve.
+// Returns where each note starts in the audio (seconds), plus the end of the last note.
+function alignToScore(notes,spb,vals,hop,trail){
+ const PAD=30,sc=[],st=[];
+ for(let i=0;i<PAD;i++)sc.push(null);
+ notes.forEach(n=>{st.push(sc.length);const nf=Math.max(1,Math.round(n.b*spb/hop));for(let i=0;i<nf;i++)sc.push(n.k?n.p:null)});
+ st.push(sc.length);
+ for(let i=0,nt=Math.round(trail*spb/hop)+PAD;i<nt;i++)sc.push(null);
+ const au=new Array(PAD).fill(null).concat(vals.map(v=>v==null||isNaN(v)?null:v),new Array(PAD).fill(null));
+ const N=sc.length,M=au.length,dir=new Uint8Array(N*M),PEN=.06;
+ const cost=(s,a)=>{if(s==null)return a==null?0:.9;if(a==null)return .9;let d=Math.abs(a-s);d=Math.min(d,Math.abs(d-12));return Math.min(d,4)*.35};
+ let prev=new Float32Array(M),cur=new Float32Array(M);
+ for(let i=0;i<N;i++){const s=sc[i];
+  for(let j=0;j<M;j++){let best,dv;
+   if(i===0&&j===0){best=0;dv=0}
+   else if(i===0){best=cur[j-1]+PEN;dv=2}
+   else if(j===0){best=prev[0]+PEN;dv=1}
+   else{best=prev[j-1];dv=0;const u=prev[j]+PEN,l=cur[j-1]+PEN;if(u<best){best=u;dv=1}if(l<best){best=l;dv=2}}
+   cur[j]=best+cost(s,au[j]);dir[i*M+j]=dv}
+  const tmp=prev;prev=cur;cur=tmp}
+ const first=new Int32Array(N);let i=N-1,j=M-1;
+ for(;;){first[i]=j;if(i===0&&j===0)break;const dv=dir[i*M+j];if(dv===0){i--;j--}else if(dv===1)i--;else j--}
+ const len=vals.length,bd=st.map(si=>Math.max(0,Math.min(len,first[si]-PAD))*hop);
+ for(let k=1;k<bd.length;k++)if(bd[k]<bd[k-1]+hop)bd[k]=Math.min(len*hop,bd[k-1]+hop);
+ return bd;
+}
+// Each note's stretch of the curve is drawn over that note as it stands now (matched by event id), so the line stays on
+// the lyrics even when the singing timing differs from the score, or SP/AP were inserted after rendering.
 function f0SVG(W,H){
- if(!S.showF0)return '';let out='';
- D.phrases.forEach(p=>{if(p.status!=='done'&&p.status!=='stale')return;const t=activeTake(p.key);if(!t)return;const perf=takePerf(t,p);const bps=perf.bpm/60;let d='',pen=false;
-  for(let k=0;k<perf.vals.length;k++){const m=perf.vals[k];if(m==null||isNaN(m)){pen=false;continue}
-   d+=(pen?'L':'M')+((p.start+k*perf.hop*bps)*S.ppb).toFixed(1)+' '+((MAXP-m+.5)*S.rowH).toFixed(1);pen=true}
+ if(!S.showF0)return '';let out='';const at=new Map(S.events.map((e,i)=>[e.id,i]));
+ D.phrases.forEach(p=>{if(p.status!=='done'&&p.status!=='stale')return;const t=activeTake(p.key);if(!t)return;const perf=takePerf(t,p);
+  const legacy=perf.notes.every(n=>n.id==null),byOrder=legacy&&perf.notes.length===p.idx.length;
+  let d='',pen=false,lastCi=-9;
+  perf.notes.forEach((n,ni)=>{if(!n.k){pen=false;return}
+   const ci=n.id!=null?at.get(n.id):byOrder?p.idx[ni]:undefined;let b0,b1;
+   if(ci!=null){const e=S.events[ci];if(!e||e.kind!=='note'||D.pOf[ci]!==p){pen=false;return}
+    b0=D.starts[ci];b1=b0+beats(e);if(ci!==lastCi+1)pen=false;lastCi=ci}
+   else if(legacy){b0=p.start+n.sb;b1=b0+n.b}
+   else{pen=false;return}
+   const span=n.e-n.s;if(span<=0)return;
+   const j0=Math.max(0,Math.floor(n.s/perf.hop)),j1=Math.min(perf.vals.length,Math.ceil(n.e/perf.hop));
+   for(let j=j0;j<j1;j++){const m=perf.vals[j];if(m==null||isNaN(m)){pen=false;continue}
+    const f=Math.min(1,Math.max(0,(j*perf.hop-n.s)/span));
+    d+=(pen?'L':'M')+((b0+f*(b1-b0))*S.ppb).toFixed(1)+' '+((MAXP-m+.5)*S.rowH).toFixed(1);pen=true}});
   if(d)out+=`<g class="${p.status==='stale'?'stale':''}"><path class="u" d="${d}"/><path class="l" d="${d}"/></g>`});
  return out?`<svg class="f0" width="${W}" height="${H}" aria-hidden="true">${out}</svg>`:'';
 }
@@ -851,7 +906,7 @@ function extractF0(buf){
   if(L0<1){vals.push(null);continue}
   const a=d[L0-1],b=d[L0],c=d[L0+1],den=a-2*b+c,sh=den?(a-c)/(2*den):0,lag=L0+Math.max(-1,Math.min(1,sh));
   vals.push(+(69+12*Math.log2(fs/lag/440)).toFixed(2))}
- return{hop:hop/fs,vals};
+ return{hop:hop/fs,vals:new Array(Math.round(W/2/hop)).fill(null).concat(vals)};
 }
 
 /* ================= side panel ================= */
@@ -862,7 +917,7 @@ function renderVoices(){
   const sub=v.kind==='preset'?`${esc(v.desc)}`:`${v.dur.toFixed(1)} 秒 · ${v.sr/1000} kHz · ${v.ch===1?'单声道':'立体声→单声道'}`;
   return `<div class="voice${sel?' sel':''}" data-voice="${esc(v.id)}" role="radio" aria-checked="${sel}" tabindex="0">
    ${av}<div class="meta"><div class="vn">${esc(v.name)}${v.kind==='preset'?`<span class="tag">${pname(v.range[0])}–${pname(v.range[1])}</span>`:v.consent?'<span class="tag ok">已授权</span>':'<span class="tag warn">待确认</span>'}</div><div class="vd">${sub}</div></div>
-   <button class="btn icon" data-audition="${esc(v.id)}" title="试听参考音频">${icon('play',14)}</button>
+   <div class="row" style="gap:2px"><button class="btn icon" data-audition="${esc(v.id)}" title="试听参考音频">${icon('play',14)}</button>${v.kind==='custom'?`<button class="btn icon" data-rmvoice="${esc(v.id)}" title="移除这个参考声线">${icon('x',14)}</button>`:''}</div>
    <canvas data-vw="${esc(v.id)}"></canvas>
    ${v.kind==='custom'?`<label class="consent"><input type="checkbox" data-consent="${esc(v.id)}" ${v.consent?'checked':''}> 我确认拥有这段录音的使用权，或已获得录音者同意。</label>`:''}
   </div>`}).join('');
@@ -900,7 +955,8 @@ function propsHTML(){
   return `<div class="card" style="margin-bottom:14px">已选中 <b>${sel.length}</b> 个事件（其中 ${notes.length} 个音符）</div>
   <div class="fld"><div class="lab">整体移调</div><div class="row"><button class="btn line" data-tr="-12">−8va</button><button class="btn line" data-tr="-1">−1 半音</button><button class="btn line" data-tr="1">+1 半音</button><button class="btn line" data-tr="12">+8va</button></div></div>
   <div class="fld"><div class="lab">统一时值</div><div class="grid12">${NV.map((n,k)=>`<button data-dur="${k}" title="${n.n}">${n.l}</button>`).join('')}</div></div>
-  <button class="btn line" data-act="delete" style="width:100%">删除选中 (Delete)</button>`}
+  <div class="row"><button class="btn line" data-act="delete" style="flex:1">删除 (Delete)</button><button class="btn line" data-act="delgap" style="flex:1" title="改为休止，后面的音符位置不变 (Shift+Delete)">改为休止</button></div>
+  <p class="hint" style="margin-top:10px">在空白处拖动可以框选，按住 Shift 或 Ctrl 追加；右键有更多操作。</p>`}
  const v=voiceObj();
  return `<div class="fld"><div class="lab">工程</div><div class="card" style="font-size:12px;line-height:1.8">
    <div class="row" style="justify-content:space-between"><span>速度</span><span class="mono">${S.bpm} BPM · ${S.bpb===6?'6/8':S.bpb+'/4'}</span></div>
@@ -973,6 +1029,7 @@ function hl(json){return json.replace(/("(?:\\.|[^"\\])*")(\s*:)?|(-?\b\d+(?:\.\
 function posStr(b){const bar=Math.floor(b/S.bpb)+1,beat=Math.floor(b%S.bpb)+1,tick=Math.round((b%1)*960);return `${bar}.${beat}.${String(tick).padStart(3,'0')}`}
 function fmtTime(s){const m=Math.floor(s/60),r=s-m*60;return `${String(m).padStart(2,'0')}:${r.toFixed(3).padStart(6,'0')}`}
 function renderStatus(){
+ const bdel=$('#btnDel');if(bdel){bdel.disabled=!S.sel.size;bdel.title=S.sel.size?`删除选中的 ${countText(countOf(S.sel))} (Delete)`:'删除选中 (Delete)'}
  const errs=D.issues.filter(x=>x.lv==='err').length,warns=D.issues.length-errs;
  const notes=S.events.filter(e=>e.kind==='note').length;
  const cp=curPhrase();
@@ -996,7 +1053,7 @@ function renderTopbar(){
 }
 let saveT=0;
 function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{
- store.set('vrstudio.project',projectData());updateTitle();
+ const pd=projectData();if(!store.set('vrstudio.project',pd)&&pd.customVoices.length){store.set('vrstudio.project',{...pd,customVoices:[]});if(!persist.warned){persist.warned=true;toast('浏览器存储空间不够，上传的参考音频没有自动保存；请保存为工程文件')}}updateTitle();
  const s=$('#saveSt');if(s)s.textContent=(isDirty()?'有未保存的更改 · ':'')+'已自动保存 '+new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});},400)}
 function renderAll(o={}){
  derive();renderRoll();renderRuler();renderLanes();renderKeys();
@@ -1016,12 +1073,15 @@ function selectIdx(i,e){const id=S.events[i].id;
  if(e&&(e.ctrlKey||e.metaKey)){S.sel.has(id)?S.sel.delete(id):S.sel.add(id)}else if(!S.sel.has(id))S.sel=new Set([id]);
  S.anchor=id;S.curPhrase=null;
 }
+const erasing=e=>!!(drag&&drag.mode==='erase'&&drag.ids.has(e.id));
 content.addEventListener('pointerdown',e=>{
  if(e.button!==0||e.target.closest('.lyr-edit'))return;
+ if(openMenu){openMenu.remove();openMenu=null}
  if(lyrEdit)closeLyr(true);
- const r=content.getBoundingClientRect();const bx=(e.clientX-r.left)/S.ppb;const py=MAXP-Math.floor((e.clientY-r.top)/S.rowH);
+ const r=content.getBoundingClientRect();const cx=e.clientX-r.left,cy=e.clientY-r.top;const bx=cx/S.ppb;const py=MAXP-Math.floor(cy/S.rowH);
  const nEl=e.target.closest('.note,.rest');
- if(S.tool==='eraser'){const i=nEl?+nEl.dataset.i:-1;if(i>=0)commit(()=>{S.events.splice(i,1);S.sel.clear()});return}
+ // eraser: everything the pointer passes over is removed when the button is released (one undo step)
+ if(S.tool==='eraser'){drag={mode:'erase',ids:new Set()};eraseAt(e);content.setPointerCapture(e.pointerId);return}
  if(nEl){const i=+nEl.dataset.i,ev=S.events[i];
   if(S.tool==='pencil'&&ev.kind==='rest'){commit(()=>{Object.assign(ev,{kind:'note',word:'啦',pitch:clampP(py)});S.sel=new Set([ev.id])});tone(ev.pitch);return}
   const now=performance.now();
@@ -1030,7 +1090,7 @@ content.addEventListener('pointerdown',e=>{
   selectIdx(i,e);
   const before=snap();
   const mode=e.target.classList.contains('edge')?'resize':(ev.kind==='note'?'pitch':'none');
-  drag={mode,i,startY:e.clientY,startX:e.clientX,before,orig:S.events.map(x=>x.pitch),lastDy:0};
+  drag={mode,i,startY:e.clientY,startX:e.clientX,cx0:cx,cy0:cy,mods:e.shiftKey||e.ctrlKey||e.metaKey,before,orig:S.events.map(x=>x.pitch),lastDy:0};
   content.setPointerCapture(e.pointerId);
   if(ev.kind==='note')tone(ev.pitch,.18);
   renderAll();return}
@@ -1038,10 +1098,36 @@ content.addEventListener('pointerdown',e=>{
  if(S.tool==='pencil'){const i=evAt(bx);
   if(i<0&&bx>=D.total){commit(()=>{const n={id:uid(),kind:'note',word:'啦',pitch:clampP(py),dur:S.newDur};S.events.push(n);S.sel=new Set([n.id]);S.anchor=n.id});tone(clampP(py))}
   return}
- S.sel.clear();S.curPhrase=null;renderAll();
+ // select tool on empty grid: drag a box to select; Shift/Ctrl adds to the selection
+ const add=e.shiftKey||e.ctrlKey||e.metaKey;if(!add){S.sel.clear();S.curPhrase=null}
+ drag={mode:'marquee',cx0:cx,cy0:cy,base:new Set(S.sel),el:null,moved:false};content.setPointerCapture(e.pointerId);renderAll();
 });
+function eraseAt(e){
+ const el=document.elementFromPoint(e.clientX,e.clientY),n=el&&el.closest?el.closest('#content .note,#content .rest'):null;if(!n)return;
+ const ev=S.events[+n.dataset.i];if(!ev||drag.ids.has(ev.id))return;
+ drag.ids.add(ev.id);n.classList.add('erasing');const lbl=content.querySelector(`.nl[data-i="${n.dataset.i}"]`);if(lbl)lbl.classList.add('erasing');
+}
+function updateMarquee(e){
+ const rr=roll.getBoundingClientRect(),E=28,STEP=14;
+ if(e.clientX>rr.right-E)roll.scrollLeft+=STEP;else if(e.clientX<rr.left+E)roll.scrollLeft-=STEP;
+ if(e.clientY>rr.bottom-E)roll.scrollTop+=STEP;else if(e.clientY<rr.top+E)roll.scrollTop-=STEP;
+ const r=content.getBoundingClientRect(),cx=e.clientX-r.left,cy=e.clientY-r.top;
+ if(!drag.moved&&Math.hypot(cx-drag.cx0,cy-drag.cy0)<4)return;drag.moved=true;
+ const x0=Math.max(0,Math.min(drag.cx0,cx)),x1=Math.max(drag.cx0,cx),y0=Math.max(0,Math.min(drag.cy0,cy)),y1=Math.max(drag.cy0,cy);
+ if(!drag.el){drag.el=document.createElement('div');drag.el.className='marquee'}
+ Object.assign(drag.el.style,{left:x0+'px',top:y0+'px',width:(x1-x0)+'px',height:(y1-y0)+'px'});
+ const b0=x0/S.ppb,b1=x1/S.ppb,pHi=MAXP-Math.floor(y0/S.rowH),pLo=MAXP-Math.floor(y1/S.rowH),sel=new Set(drag.base);
+ S.events.forEach((ev,i)=>{const s=D.starts[i],en=s+beats(ev);if(en<=b0||s>=b1)return;
+  if(ev.kind==='note'){if(ev.pitch>=pLo&&ev.pitch<=pHi)sel.add(ev.id)}else{const c=(s+en)/2;if(c>=b0&&c<=b1)sel.add(ev.id)}});
+ const changed=sel.size!==S.sel.size||[...sel].some(id=>!S.sel.has(id));S.sel=sel;
+ if(changed){renderRoll();renderStatus()}else if(!drag.el.isConnected)content.appendChild(drag.el);
+}
 content.addEventListener('pointermove',e=>{
  if(!drag)return;
+ if(drag.mode==='erase'){eraseAt(e);return}
+ // dragging from a rest or breath turns into a box selection
+ if(drag.mode==='none'&&Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>5)drag={mode:'marquee',cx0:drag.cx0,cy0:drag.cy0,base:new Set(drag.mods?S.sel:[]),el:null,moved:false};
+ if(drag.mode==='marquee'){updateMarquee(e);return}
  if(drag.mode==='pitch'){const dy=Math.round((drag.startY-e.clientY)/S.rowH);if(dy===drag.lastDy)return;drag.lastDy=dy;
   S.events.forEach((x,k)=>{if(S.sel.has(x.id)&&x.kind==='note')x.pitch=clampP(drag.orig[k]+dy)});
   tone(S.events[drag.i].pitch,.15);renderAll({skipInsp:true})}
@@ -1049,8 +1135,15 @@ content.addEventListener('pointermove',e=>{
   let best=0,bd=1e9;NV.forEach((n,k)=>{const d=Math.abs(n.b-want);if(d<bd){bd=d;best=k}});
   if(S.events[drag.i].dur!==best){S.events[drag.i].dur=best;renderAll({skipInsp:true})}}
 });
-const endDrag=()=>{if(!drag)return;const b=drag.before;drag=null;if(snap()!==b)pushHist(b);renderAll()};
+const endDrag=()=>{if(!drag)return;const d=drag;drag=null;
+ if(d.mode==='erase'){if(!d.ids.size)return renderRoll();const c=countOf([...d.ids]);commit(()=>{S.events=S.events.filter(x=>!d.ids.has(x.id));S.sel.clear()});if(c.n>1)toast(`已删除 ${countText(c)}，Ctrl+Z 可撤销`);return}
+ if(d.mode==='marquee'){if(d.el)d.el.remove();renderAll();return}
+ if(snap()!==d.before)pushHist(d.before);renderAll()};
 content.addEventListener('pointerup',endDrag);content.addEventListener('pointercancel',endDrag);
+// right-click: menu for the selection (a note outside the selection becomes the selection first)
+content.addEventListener('contextmenu',e=>{e.preventDefault();if(drag)return;if(lyrEdit)closeLyr(true);
+ const n=e.target.closest('.note,.rest');if(n){const ev=S.events[+n.dataset.i];if(ev&&!S.sel.has(ev.id)){S.sel=new Set([ev.id]);S.anchor=ev.id;S.curPhrase=null;renderAll()}}
+ popMenu(rollMenu(),e.clientX,e.clientY)});
 const clampP=p=>Math.max(MINP,Math.min(MAXP,p));
 
 function openLyr(i){
@@ -1087,6 +1180,7 @@ $('#ruler').addEventListener('pointerdown',e=>{
  seek(Math.max(0,b));
 });
 $('#lanes').addEventListener('click',e=>{const s=e.target.closest('.lseg');if(s){selectPhrase(s.dataset.key,true)}});
+$('#ruler').addEventListener('contextmenu',e=>{e.preventDefault();const pb=e.target.closest('.pband');if(!pb||!D.byKey[pb.dataset.key])return;selectPhrase(pb.dataset.key,false);popMenu(phraseMenu(pb.dataset.key),e.clientX,e.clientY)});
 function selectPhrase(key,showTakes){const p=D.byKey[key];if(!p)return;S.curPhrase=key;S.sel=new Set(p.idx.map(i=>S.events[i].id));if(showTakes)S.tab='takes';showInspOnMobile();renderAll()}
 $('#keysIn').addEventListener('pointerdown',e=>{const k=e.target.closest('.key');if(k)tone(+k.dataset.p,.35)});
 
@@ -1099,7 +1193,26 @@ function insert(kind){
   S.events.splice(at,0,n);S.sel=new Set([n.id]);S.anchor=n.id;S.curPhrase=null});
  if(kind==='note')setTimeout(()=>openLyr(S.events.findIndex(e=>S.sel.has(e.id))),0);
 }
-function delSel(){if(!S.sel.size)return;commit(()=>{S.events=S.events.filter(e=>!S.sel.has(e.id));S.sel.clear()})}
+function countOf(ids){const set=new Set(ids);let n=0,notes=0;S.events.forEach(e=>{if(set.has(e.id)){n++;if(e.kind==='note')notes++}});return{n,notes,other:n-notes}}
+function countText(c){return c.other?`${c.n} 个事件`:`${c.n} 个音符`}
+function selectAll(){S.sel=new Set(S.events.map(e=>e.id));S.curPhrase=null;renderAll()}
+// Delete the selection. keepGap: turn it into rests (SP) instead, so later notes keep their positions.
+function delSel(keepGap){if(!S.sel.size)return;const c=countOf(S.sel);
+ commit(()=>{if(keepGap)S.events.forEach(e=>{if(S.sel.has(e.id)&&e.kind!=='rest')Object.assign(e,{kind:'rest',word:'SP',pitch:0})});else S.events=S.events.filter(e=>!S.sel.has(e.id));S.sel.clear();S.curPhrase=null});
+ if(keepGap)toast(`已把 ${countText(c)}改为休止，后面的音符位置不变`);else if(c.n>1)toast(`已删除 ${countText(c)}，Ctrl+Z 可撤销`)}
+function deletePhrase(key){const p=D.byKey[key];if(!p)return;const ids=new Set(p.idx.map(i=>S.events[i].id));
+ // also drop its trailing rest when that would leave two rests in a row
+ const prev=S.events[p.idx[0]-1];if(p.trail!=null&&(!prev||prev.kind==='rest'))ids.add(S.events[p.trail].id);
+ const c=countOf(ids);commit(()=>{S.events=S.events.filter(e=>!ids.has(e.id));S.sel.clear();S.curPhrase=null});toast(`已删除乐句 P${p.n}（${countText(c)}），Ctrl+Z 可撤销`)}
+function rollMenu(){const c=countOf(S.sel),p=curPhrase();return[
+ [c.n?`删除 ${countText(c)}`:'删除','Delete',()=>delSel(false),!c.n],
+ ['删除并保留空位（改为休止）','Shift+Delete',()=>delSel(true),!c.n],0,
+ [p?`选中整句 P${p.n}`:'选中整句','',()=>selectPhrase(p.key,false),!p],
+ [p?`删除整句 P${p.n}`:'删除整句','',()=>deletePhrase(p.key),!p],0,
+ ['全选','Ctrl+A',selectAll],['取消选择','Esc',()=>{S.sel.clear();S.curPhrase=null;renderAll()},!c.n]]}
+function phraseMenu(key){const p=D.byKey[key];return[
+ [`渲染 P${p.n}`,'',()=>{S.curPhrase=key;enqueue(key)},!renderable(p)],[`试听 P${p.n}`,'',()=>play(key)],0,
+ [`选中整句 P${p.n}`,'',()=>selectPhrase(key,false)],[`删除整句 P${p.n}`,'',()=>deletePhrase(key)]]}
 function transpose(d){commit(()=>S.events.forEach(e=>{if(S.sel.has(e.id)&&e.kind==='note')e.pitch=clampP(e.pitch+d)}));const i=selIdx().find(i=>S.events[i].kind==='note');if(i!=null)tone(S.events[i].pitch,.2)}
 function setDur(k){commit(()=>S.events.forEach(e=>{if(S.sel.has(e.id))e.dur=k}))}
 function stepDur(d){commit(()=>S.events.forEach(e=>{if(S.sel.has(e.id))e.dur=Math.max(0,Math.min(11,e.dur+d))}))}
@@ -1187,7 +1300,7 @@ function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
   const take=forceTake||(opt.exp||p.status==='done'||p.status==='stale'?activeTake(p.key):null);
   const useVoice=take&&(forceTake||opt.exp||p.status==='done');
   if(opt.exp&&!useVoice)return;
-  if(useVoice&&take.buffer){const st=t0+Math.max(0,p.start-fromBeat)*spb;const off=Math.max(0,fromBeat-p.start)*spb;if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);sink.push(s)}return}
+  if(useVoice&&take.buffer){const lead=take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);sink.push(s)}return}
   const v=voiceObj();
   if(useVoice){const perf=takePerf(take,p);const ps=p.start*spb,fsec=fromBeat*spb,vopts={vibRate:5.5,vibDepth:0,fs:v.fs||1,vol:1};
    perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+n.s,off=Math.max(0,fsec-a),dur=n.e-n.s-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
@@ -1235,7 +1348,7 @@ function renderPending(){
 }
 function enqueue(key){const p=D.byKey[key];if(!p||!renderable(p))return;
  const gl=D.issues.find(x=>x.global&&x.lv==='err');if(gl)return toast(gl.msg,'err');
- const r=rec(key);r.job={state:'queued',progress:0,hash:p.hash,request:renderRequest(p),snap:{bpm:S.bpm,notes:snapshotNotes(p)},abort:null};queue.push(key);renderAll();pump()}
+ const r=rec(key);r.job={state:'queued',progress:0,hash:p.hash,request:renderRequest(p),snap:snapshotOf(p),voiceId:S.voice,abort:null};queue.push(key);renderAll();pump()}
 async function pump(){
  if(working||!queue.length)return;const key=queue.shift();const r=S.renders[key];if(!r||!r.job){pump();return}
  working=key;r.job.state='rendering';renderAll();
@@ -1243,7 +1356,7 @@ async function pump(){
   const res=await Client.render(r.job.request,pr=>{if(!r.job)return;r.job.progress=pr;liveProgress(key)},r.job);
   if(!r.job)throw new Error('cancelled');
   const seed=r.job.request.generation.seed??res.seed;
-  const t={id:'t'+Date.now().toString(36),n:(r.takes.reduce((m,x)=>Math.max(m,x.n),0))+1,seed,hash:r.job.hash,params:r.job.request.generation,ckpt:r.job.request.checkpoint,voice:voiceObj().name,at:Date.now(),buffer:res.buffer||null,snap:r.job.snap,f0:res.f0||null};
+  const t={id:'t'+Date.now().toString(36),n:(r.takes.reduce((m,x)=>Math.max(m,x.n),0))+1,seed,hash:r.job.hash,params:r.job.request.generation,ckpt:r.job.request.checkpoint,voice:(allVoices().find(v=>v.id===r.job.voiceId)||voiceObj()).name,at:Date.now(),buffer:res.buffer||null,snap:r.job.snap,f0:res.f0||null};
   r.takes.push(t);r.active=t.id;r.job=null;
  }catch(err){if(r.job){r.job=null;if(err.message!=='cancelled')toast('渲染失败：'+err.message,'err')}}
  working=null;renderAll();
@@ -1263,18 +1376,54 @@ const Client={
  async render(req,onProgress,job){
   if(S.service.mode==='demo')return mockRender(req,onProgress,job);
   const ac=new AbortController();job.abort=()=>ac.abort();
-  const base=S.service.base.replace(/\/$/,'');const H={'Content-Type':'application/json'};if(S.service.key)H.Authorization='Bearer '+S.service.key;
-  const r=await http(base+'/render',{method:'POST',headers:H,body:JSON.stringify(req),signal:ac.signal}).catch(()=>{throw new Error('无法连接服务，请检查服务地址')});
-  if(!r.ok)throw new Error(await errText(r));const{job_id}=await r.json();
-  for(;;){await sleep(700);if(ac.signal.aborted)throw new Error('cancelled');const s=await http(`${base}/jobs/${job_id}`,{headers:H,signal:ac.signal});if(!s.ok)throw new Error(await errText(s));const j=await s.json();
+  const base=S.service.base.replace(/\/$/,''),auth=S.service.key?{Authorization:'Bearer '+S.service.key}:{},H={'Content-Type':'application/json',...auth};
+  const v=allVoices().find(x=>x.id===job.voiceId);
+  // an uploaded reference voice is sent to the service first (POST /voices); the render request then names its upload_id
+  const submit=async force=>{const body={...req};
+   if(v&&v.kind==='custom')body.prompt_audio={upload_id:await uploadVoice(v,base,auth,force),duration:+v.dur.toFixed(2)};
+   return http(base+'/render',{method:'POST',headers:H,body:JSON.stringify(body),signal:ac.signal}).catch(()=>{throw new Error('无法连接服务，请检查服务地址')})};
+  let r=await submit(false);
+  if(!r.ok){const msg=await errText(r);
+   // the service may have forgotten an earlier upload (restart, expiry): upload again once and retry
+   if(v&&v.kind==='custom'&&/upload/i.test(msg)){r=await submit(true);if(!r.ok)throw new Error(await errText(r))}else throw new Error(msg)}
+  const{job_id}=await r.json();
+  for(;;){await sleep(700);if(ac.signal.aborted)throw new Error('cancelled');const s=await http(`${base}/jobs/${job_id}`,{headers:auth,signal:ac.signal});if(!s.ok)throw new Error(await errText(s));const j=await s.json();
    onProgress(j.progress||0);
-   if(j.status==='succeeded'){const a=await http(j.audio_url?new URL(j.audio_url,base+'/').toString():`${base}/jobs/${job_id}/audio`,{headers:H,signal:ac.signal});const buf=await ctx().decodeAudioData(await a.arrayBuffer());const f0=j.f0&&Array.isArray(j.f0.hz)?{hop:+j.f0.hop_s||.01,vals:j.f0.hz.map(h=>h>0?+(69+12*Math.log2(h/440)).toFixed(2):null)}:extractF0(buf);return{buffer:buf,seed:j.seed,f0}}
-   if(j.status==='failed')throw new Error(j.error||'服务端渲染失败')}
+   if(j.status==='succeeded'){const a=await http(j.audio_url?new URL(j.audio_url,base+'/').toString():`${base}/jobs/${job_id}/audio`,{headers:auth,signal:ac.signal});if(!a.ok)throw new Error('下载渲染结果失败：'+await errText(a));const buf=await ctx().decodeAudioData(await a.arrayBuffer());const f0=j.f0&&Array.isArray(j.f0.hz)?{hop:+j.f0.hop_s||.01,vals:j.f0.hz.map(h=>h>0?+(69+12*Math.log2(h/440)).toFixed(2):null)}:extractF0(buf);return{buffer:buf,seed:j.seed,f0}}
+   if(j.status==='failed')throw new Error(j.error||j.detail||'服务端渲染失败')}
  },
  async health(){if(S.service.mode==='demo')return '演示服务正常';const r=await http(S.service.base.replace(/\/$/,'')+'/health');if(!r.ok)throw new Error('HTTP '+r.status);return '连接成功'}
 };
 async function errText(r){try{const j=await r.json();return j.detail||j.error||('HTTP '+r.status)}catch(e){return 'HTTP '+r.status}}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function allVoices(){return[...VOICES,...S.customVoices]}
+function bytesToB64(u){let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)}
+// Reference audio as a mono 16-bit WAV (at most 20 s): what gets uploaded and stored with the project
+function voiceWav(v){if(v._wav)return v._wav;const b=v.buffer;if(!b)throw new Error(`参考声线「${v.name}」的音频还没有载入，请稍后再试或重新上传`);
+ const n=Math.min(b.length,Math.round(b.sampleRate*20)),mono=new Float32Array(n);
+ for(let c=0;c<b.numberOfChannels;c++){const d=b.getChannelData(c);for(let i=0;i<n;i++)mono[i]+=d[i]/b.numberOfChannels}
+ return v._wav=encodeWav({numberOfChannels:1,sampleRate:b.sampleRate,length:n,getChannelData:()=>mono},16)}
+function voiceB64(v){return v._b64||(v._b64=bytesToB64(voiceWav(v)))}
+function multipart(fields){const bd='----VocalRenderStudio'+Math.random().toString(16).slice(2),enc=new TextEncoder(),parts=[];
+ Object.entries(fields).forEach(([k,v])=>{if(v&&v.data)parts.push(enc.encode(`--${bd}\r\nContent-Disposition: form-data; name="${k}"; filename="${v.name}"\r\nContent-Type: ${v.type}\r\n\r\n`),v.data,enc.encode('\r\n'));
+  else parts.push(enc.encode(`--${bd}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`))});
+ parts.push(enc.encode(`--${bd}--\r\n`));const out=new Uint8Array(parts.reduce((a,x)=>a+x.length,0));let o=0;parts.forEach(x=>{out.set(x,o);o+=x.length});
+ return{body:out,type:'multipart/form-data; boundary='+bd}}
+async function uploadVoice(v,base,auth,force){v.uploads=v.uploads||{};if(!force&&v.uploads[base])return v.uploads[base];
+ const{body,type}=multipart({file:{name:'reference.wav',type:'audio/wav',data:voiceWav(v)},name:v.name});
+ const r=await http(base+'/voices',{method:'POST',headers:{...auth,'Content-Type':type},body}).catch(()=>{throw new Error('无法连接服务，请检查服务地址')});
+ if(!r.ok)throw new Error('上传参考音频失败：'+await errText(r));
+ const j=await r.json().catch(()=>({}));if(!j.upload_id)throw new Error('上传参考音频失败：服务没有返回 upload_id');
+ return v.uploads[base]=j.upload_id}
+// Uploaded voices saved with a project (or the browser's autosave) come back from their stored WAV
+function restoreVoices(list){
+ const vs=list.filter(x=>x&&x.id&&x.wav).map(x=>({id:x.id,kind:'custom',name:x.name||'我的声线',dur:+x.dur||0,sr:+x.sr||48000,ch:+x.ch||1,consent:!!x.consent,range:[MINP,MAXP],fs:1,buffer:null,_b64:x.wav,uploads:{}}));
+ S.customVoices=[...S.customVoices.filter(v=>!vs.some(x=>x.id===v.id)),...vs];
+ vs.forEach(v=>{try{v._wav=b64ToBytes(v._b64)}catch(e){return}
+  new OfflineAudioContext(1,1,48000).decodeAudioData(v._wav.slice().buffer).then(b=>{v.buffer=b;if(document.getElementById('voiceList'))renderVoices()})
+   .catch(()=>toast(`参考声线「${v.name}」的音频无法读取，请重新上传`,'err'))});
+}
+function removeVoice(id){const v=S.customVoices.find(x=>x.id===id);if(!v)return;S.customVoices=S.customVoices.filter(x=>x!==v);if(S.voice===id)S.voice='Alto-1';renderVoices();renderAll();toast(`已移除参考声线「${v.name}」`)}
 function mockRender(req,onProgress,job){return new Promise((res,rej)=>{
  const total=900+req.score.pitch.length*110*(req.generation.inference_timesteps/10);const t0=performance.now();
  const iv=setInterval(()=>{const pr=Math.min(1,(performance.now()-t0)/total);onProgress(pr);if(pr>=1){clearInterval(iv);res({seed:Math.floor(Math.random()*1e9)})}},90);
@@ -1289,18 +1438,23 @@ const MENUS={
  file:[['新建空白工程',DESK?'Ctrl+N':'',()=>newProject()],['打开工程文件…','Ctrl+O',()=>openProject()],...(DESK?[['保存','Ctrl+S',()=>saveProject(false)],['另存为…','Ctrl+Shift+S',()=>saveProject(true)]]:[]),0,
   ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};renderAll();toast('已载入示例')}],0,
   ['导入乐谱…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
- edit:[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',()=>{S.sel=new Set(S.events.map(e=>e.id));renderAll()}],['删除选中','Delete',delSel],0,['渲染所有未渲染乐句','Ctrl+R',renderPending]],
+ edit:[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending]],
  help:[['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
 let openMenu=null;
+// items: [label, shortcut, action, disabled] or 0 for a separator
+function popMenu(items,x,y){if(openMenu){openMenu.remove();openMenu=null}
+ const m=document.createElement('div');m.className='menu';m.setAttribute('role','menu');
+ m.innerHTML=items.map((it,k)=>it?`<button role="menuitem" data-mi="${k}"${it[3]?' disabled':''}>${esc(it[0])}<span class="kbd" style="border:0">${it[1]||''}</span></button>`:'<hr>').join('');
+ document.body.appendChild(m);m.style.left=Math.max(4,Math.min(x,innerWidth-m.offsetWidth-4))+'px';m.style.top=Math.max(4,Math.min(y,innerHeight-m.offsetHeight-4))+'px';openMenu=m;
+ m.addEventListener('click',ev=>{const b=ev.target.closest('[data-mi]');if(!b||b.disabled)return;m.remove();openMenu=null;items[+b.dataset.mi][2]()});
+ const f=m.querySelector('button:not([disabled])');if(f)f.focus({preventScroll:true});
+}
 document.addEventListener('click',e=>{const mb=e.target.closest('[data-menu]');
  if(openMenu&&!e.target.closest('.menu')){openMenu.remove();openMenu=null;if(!mb)return}
- if(mb){const m=document.createElement('div');m.className='menu';m.setAttribute('role','menu');const items=MENUS[mb.dataset.menu];
-  m.innerHTML=items.map((it,k)=>it?`<button role="menuitem" data-mi="${k}">${it[0]}<span class="kbd" style="border:0">${it[1]}</span></button>`:'<hr>').join('');
-  const r=mb.getBoundingClientRect();m.style.left=r.left+'px';m.style.top=r.bottom+4+'px';document.body.appendChild(m);openMenu=m;
-  m.addEventListener('click',ev=>{const b=ev.target.closest('[data-mi]');if(!b)return;m.remove();openMenu=null;items[+b.dataset.mi][2]()})}
+ if(mb){const r=mb.getBoundingClientRect();popMenu(MENUS[mb.dataset.menu],r.left,r.bottom+4)}
 });
 function confirmDlg(t,msg,ok,fn){dialog(t,`<p style="margin:0;line-height:1.6">${esc(msg)}</p>`,`<button class="btn line" data-close>取消</button><button class="btn primary" id="cfOk">${esc(ok)}</button>`,o=>o.querySelector('#cfOk').onclick=()=>{closeDialog();fn()})}
-function kbDlg(){const K=[['播放 / 暂停','Space'],['停止并回到开头','Esc'],['回到开头 / 结尾','Home / End'],['选择 / 铅笔 / 橡皮','V / B / E'],['选中前一个 / 后一个','← / →'],['音高 ±1 半音','↑ / ↓'],['音高 ±1 八度','Shift + ↑ / ↓'],['缩短 / 延长时值','[ / ]'],['编辑歌词（Tab 跳到下一个）','Enter / 双击'],['插入音符 / 休止 / 连音','N / R / M'],['删除','Delete'],['撤销 / 重做','Ctrl+Z / Ctrl+Shift+Z'],['全选','Ctrl+A'],['渲染未渲染乐句','Ctrl+R'],['横向缩放 / 纵向缩放','Ctrl+滚轮 / Alt+滚轮'],['自由定位播放头','按住 Alt 点标尺']];
+function kbDlg(){const K=[['播放 / 暂停','Space'],['停止并回到开头','Esc'],['回到开头 / 结尾','Home / End'],['选择 / 铅笔 / 橡皮','V / B / E'],['选中前一个 / 后一个','← / →'],['音高 ±1 半音','↑ / ↓'],['音高 ±1 八度','Shift + ↑ / ↓'],['缩短 / 延长时值','[ / ]'],['编辑歌词（Tab 跳到下一个）','Enter / 双击'],['插入音符 / 休止 / 连音','N / R / M'],['删除选中','Delete / Backspace'],['删除并保留空位（改为休止）','Shift+Delete'],['框选多个（Shift/Ctrl 追加）','在空白处拖动'],['连续删除','橡皮工具拖过音符'],['删除整句、更多操作','右键音符或乐句条'],['撤销 / 重做','Ctrl+Z / Ctrl+Shift+Z'],['全选','Ctrl+A'],['渲染未渲染乐句','Ctrl+R'],['横向缩放 / 纵向缩放','Ctrl+滚轮 / Alt+滚轮'],['自由定位播放头','按住 Alt 点标尺']];
  dialog('快捷键',`<div class="kb-grid">${K.map(([a,b])=>`<span>${a}</span><kbd>${b}</kbd>`).join('')}</div>`)}
 function aboutDlg(){dialog('关于 VocalRender',`<div style="line-height:1.75;font-size:13px">${DESK?`<p style="margin-top:0"><b>VocalRender Studio 桌面版 v${esc(DESK.info.version||'')}</b></p>`:''}
  <p style="margin-top:0">VocalRender 是乐谱原生（score-native）的歌声合成模型：直接读取歌词、MIDI 音高、音符时值和全局速度，生成 48 kHz 歌声，不需要逐音素时长或对齐好的参考音频。</p>
@@ -1372,7 +1526,7 @@ async function addVoice(f){
  if(b.duration<2)return toast(`参考音频只有 ${b.duration.toFixed(1)} 秒，需要 2–8 秒的清唱`,'err');
  if(b.duration>8)toast(`音频 ${b.duration.toFixed(1)} 秒，超过 8 秒。服务端只截取其中一段，建议先裁剪出最干净的 2–8 秒`);
  const v={id:'u_'+Date.now().toString(36),kind:'custom',name:f.name.replace(/\.[^.]+$/,'').slice(0,18)||'我的声线',dur:b.duration,sr:b.sampleRate,ch:b.numberOfChannels,buffer:b,consent:false,range:[MINP,MAXP],fs:1,uploadId:'upl_'+hashStr(f.name+f.size)};
- S.customVoices.push(v);S.voice=v.id;renderVoices();renderAll();toast('已添加参考声线，请确认使用授权');
+ v.uploads={};delete v.uploadId;S.customVoices.push(v);S.voice=v.id;renderVoices();renderAll();toast('已添加参考声线，请确认使用授权');
 }
 $('#bLoad').addEventListener('click',()=>$('#bkFile').click());
 $('#bkFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(f)loadBacking(f)});
@@ -1386,17 +1540,20 @@ function b64ToBytes(b){const s=atob(b||''),u=new Uint8Array(s.length);for(let i=
 // Service requests: the desktop app sends them from the main process (no browser CORS rules); the web page uses fetch
 function http(url,init={}){
  if(!DESK||!DESK.request)return fetch(url,init);
- return DESK.request({url:String(url),method:init.method||'GET',headers:init.headers||{},body:typeof init.body==='string'?init.body:null})
+ const b=init.body;
+ return DESK.request({url:String(url),method:init.method||'GET',headers:init.headers||{},...(b instanceof Uint8Array?{bodyB64:bytesToB64(b)}:{body:typeof b==='string'?b:null})})
   .then(r=>new Response([101,204,205,304].includes(r.status)?null:b64ToBytes(r.body),{status:r.status,statusText:r.statusText||'',headers:r.headers||{}}));
 }
 function projectData(){const renders={};Object.entries(S.renders).forEach(([k,r])=>{if(r.takes.length)renders[k]={takes:r.takes.map(t=>({...t,buffer:undefined})),active:r.active,job:null}});
- return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,renders}}
+ const customVoices=S.customVoices.filter(v=>v._b64||v.buffer).map(v=>({id:v.id,name:v.name,dur:+(+v.dur).toFixed(3),sr:v.sr,ch:v.ch,consent:!!v.consent,wav:voiceB64(v)}));
+ return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,customVoices,renders}}
 const projectJSON=()=>JSON.stringify(projectData());
 const isDirty=()=>!!fileRef&&savedJSON!==projectJSON();
 function updateTitle(){if(!DESK)return;document.title=(isDirty()?'● ':'')+(fileRef?fileRef.name.replace(/\.vrproj$/i,''):S.name)+' - VocalRender Studio'}
 function loadProject(o,ref){
  if(!o||(o.format&&o.format!=='vocalrender-studio-project')||!Array.isArray(o.events))throw new Error('不是 VocalRender Studio 工程文件');
  if(audio.playing)pause();queue.length=0;
+ if(Array.isArray(o.customVoices))restoreVoices(o.customVoices);
  Object.assign(S,{name:o.name||'未命名工程',bpm:+o.bpm||90,bpb:+o.bpb||4,events:o.events.map(e=>({...e,id:e.id||uid()})),voice:[...VOICES,...S.customVoices].some(v=>v.id===o.voice)?o.voice:'Alto-1',ckpt:o.ckpt||'VocalRender-Pro',renders:o.renders||{}});
  Object.values(S.renders).forEach(r=>r.job=null);if(o.gen)Object.assign(S.gen,o.gen);
  S.sel.clear();S.curPhrase=null;S.playhead=0;hist=[];redo=[];perfCache.clear();
@@ -1470,6 +1627,7 @@ $('#btnStop').innerHTML=icon('stop');$('#btnStop').onclick=stop;
 $('#btnHome').innerHTML=icon('home');$('#btnHome').onclick=()=>seek(0);
 $('#btnUndo').innerHTML=icon('undo');$('#btnUndo').onclick=undo;
 $('#btnRedo').innerHTML=icon('redo');$('#btnRedo').onclick=doRedo;
+$('#btnDel').innerHTML=icon('trash');$('#btnDel').onclick=()=>delSel(false);
 $('#btnSettings').innerHTML=icon('gear');$('#btnSettings').onclick=settingsDlg;
 $('#btnInsp').innerHTML=icon('panel');$('#btnInsp').onclick=()=>{$('#app').classList.toggle('show-insp');$('#app').classList.remove('show-side')};
 $('#btnSide').innerHTML=icon('panelL');$('#btnSide').onclick=()=>{$('#app').classList.toggle('show-side');$('#app').classList.remove('show-insp')};
@@ -1492,6 +1650,7 @@ $$('.tab').forEach(t=>t.onclick=()=>{S.tab=t.dataset.tab;renderInspector()});
 
 $('#voiceList').addEventListener('click',e=>{
  const au=e.target.closest('[data-audition]');if(au){e.stopPropagation();audition(au.dataset.audition);return}
+ const rm=e.target.closest('[data-rmvoice]');if(rm){e.stopPropagation();removeVoice(rm.dataset.rmvoice);return}
  if(e.target.closest('[data-consent]'))return;
  const v=e.target.closest('[data-voice]');if(v&&v.dataset.voice!==S.voice){S.voice=v.dataset.voice;renderVoices();renderAll()}
 });
@@ -1515,7 +1674,8 @@ $('#inspBody').addEventListener('click',e=>{
  else if(d.act==='newtake'){const p=curPhrase();if(p){S.curPhrase=p.key;enqueue(p.key)}}
  else if(d.act==='solo'){const p=curPhrase();if(p)play(p.key)}
  else if(d.act==='cancel'){const p=curPhrase();if(p)cancelOne(p.key)}
- else if(d.act==='delete')delSel();
+ else if(d.act==='delete')delSel(false);
+ else if(d.act==='delgap')delSel(true);
  else if(d.act==='copyapi')copyApi();
  else if(d.pick){const p=curPhrase();S.renders[p.key].active=d.pick;renderAll()}
  else if(d.playtake){const p=curPhrase();const tk=S.renders[p.key].takes.find(x=>x.id===d.playtake);play(p.key,tk)}
@@ -1538,6 +1698,7 @@ $('#status').addEventListener('click',e=>{if(!e.target.closest('#stIssues'))retu
 
 document.addEventListener('keydown',e=>{
  if(!$('#overlay').hidden){if(e.key==='Escape'&&!$('#overlay [data-modal]'))closeDialog();return}
+ if(openMenu){if(e.key==='Escape'){e.preventDefault();openMenu.remove();openMenu=null}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const bs=[...openMenu.querySelectorAll('button:not([disabled])')];if(bs.length){const i=bs.indexOf(document.activeElement);bs[(i+(e.key==='ArrowDown'?1:bs.length-1))%bs.length].focus()}}return}
  const tag=(e.target.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select'||e.target.isContentEditable)return;
  const mod=e.ctrlKey||e.metaKey;const k=e.key;
  if(mod&&k.toLowerCase()==='z'){e.preventDefault();e.shiftKey?doRedo():undo();return}
@@ -1555,7 +1716,7 @@ document.addEventListener('keydown',e=>{
   case 'ArrowUp':case 'ArrowDown':if(S.sel.size){e.preventDefault();transpose((k==='ArrowUp'?1:-1)*(e.shiftKey?12:1))}break;
   case 'ArrowLeft':case 'ArrowRight':e.preventDefault();moveSel(k==='ArrowRight'?1:-1);break;
   case '[':stepDur(-1);break;case ']':stepDur(1);break;
-  case 'Delete':case 'Backspace':e.preventDefault();delSel();break;
+  case 'Delete':case 'Backspace':e.preventDefault();delSel(e.shiftKey);break;
   case 'Enter':{const i=selIdx()[0];if(i!=null){e.preventDefault();openLyr(i)}break}
   case 'v':case 'V':setTool('select');break;case 'b':case 'B':setTool('pencil');break;case 'e':case 'E':setTool('eraser');break;
   case 'n':case 'N':insert('note');break;case 'r':case 'R':insert('rest');break;case 'm':case 'M':insert('mel');break;
@@ -1569,7 +1730,7 @@ let rz=0;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{rend
 setTool('select');renderVoices();
 // seed demo takes for the first two phrases so the opening view shows the full workflow (example data)
 derive();
-if(!saved){D.phrases.slice(0,2).forEach((p,k)=>{const r=rec(p.key);const mk=(n,seed)=>({id:'t'+n+p.key,n,seed,hash:p.hash,params:genParams(),ckpt:S.ckpt,voice:voiceObj().name,at:Date.now()-((3-n)*60000),snap:{bpm:S.bpm,notes:snapshotNotes(p)}});r.takes=k===0?[mk(1,73021),mk(2,511984)]:[mk(1,90311)];r.active=r.takes[r.takes.length-1].id})}
+if(!saved){D.phrases.slice(0,2).forEach((p,k)=>{const r=rec(p.key);const mk=(n,seed)=>({id:'t'+n+p.key,n,seed,hash:p.hash,params:genParams(),ckpt:S.ckpt,voice:voiceObj().name,at:Date.now()-((3-n)*60000),snap:snapshotOf(p)});r.takes=k===0?[mk(1,73021),mk(2,511984)]:[mk(1,90311)];r.active=r.takes[r.takes.length-1].id})}
 {const f=S.events.find(e=>e.word==='我')||S.events.find(e=>e.kind==='note');if(f){S.sel=new Set([f.id]);S.anchor=f.id}}
 renderAll();
 requestAnimationFrame(()=>{const ps=S.events.filter(e=>e.kind==='note').map(e=>e.pitch);const avg=ps.length?ps.reduce((a,b)=>a+b)/ps.length:64;roll.scrollTop=(MAXP-avg)*S.rowH-roll.clientHeight/2;renderLanes()});

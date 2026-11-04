@@ -1,7 +1,7 @@
 {
   "name": "vocalrender-studio-desktop",
   "productName": "VocalRender Studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "VocalRender 歌声合成编辑器 Windows 桌面版",
   "author": "wenbo1188",
   "private": true,

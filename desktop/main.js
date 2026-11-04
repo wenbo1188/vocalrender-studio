@@ -112,7 +112,10 @@ ipcMain.handle('vr:request', async (_e, req) => {
   const url = new URL(String(req && req.url));
   if (!/^https?:$/.test(url.protocol)) throw new Error('服务地址只支持 http 或 https');
   const init = { method: req.method || 'GET', headers: req.headers || {} };
-  if (req.body != null && !['GET', 'HEAD'].includes(init.method)) init.body = req.body;
+  if (!['GET', 'HEAD'].includes(init.method)) {
+    if (req.bodyB64 != null) init.body = Buffer.from(req.bodyB64, 'base64'); // binary bodies, e.g. the reference-audio upload
+    else if (req.body != null) init.body = req.body;
+  }
   const res = await net.fetch(url.toString(), init);
   const body = Buffer.from(await res.arrayBuffer());
   return { status: res.status, statusText: res.statusText, headers: Object.fromEntries(res.headers.entries()), body: body.toString('base64') };

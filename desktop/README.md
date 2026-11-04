@@ -28,12 +28,12 @@
    npm run dist
    ```
 
-完成后在 `desktop\dist\` 下得到两个文件：
+完成后在 `desktop\dist\` 下得到两个文件（文件名里的版本号取自 `package.json`）：
 
 | 文件 | 说明 |
 |---|---|
-| `VocalRender-Studio-1.0.0-Setup.exe` | 安装版：可选安装位置，创建开始菜单和桌面快捷方式，关联 `.vrproj` |
-| `VocalRender-Studio-1.0.0-Portable.exe` | 便携版：单个 exe，双击直接运行，不写注册表 |
+| `VocalRender-Studio-1.0.1-Setup.exe` | 安装版：可选安装位置，创建开始菜单和桌面快捷方式，关联 `.vrproj` |
+| `VocalRender-Studio-1.0.1-Portable.exe` | 便携版：单个 exe，双击直接运行，不写注册表 |
 
 其他命令：
 
