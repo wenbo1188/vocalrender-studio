@@ -1529,12 +1529,12 @@ function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
   const take=forceTake||(opt.exp||p.status==='done'||p.status==='stale'?activeTake(p.key):null);
   const useVoice=take&&(forceTake||opt.exp||p.status==='done');
   if(opt.exp&&!useVoice)return;
-  if(useVoice&&take.buffer){const buf=take.buffer,lead=take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<buf.duration){const s=c.createBufferSource();s.buffer=buf;s.connect(vg);s.start(st,off);sink.push(s)}return}
+  if(useVoice&&take.buffer){const lead=take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);sink.push(s)}return}
   const v=voiceObj();
   if(useVoice){const perf=takePerf(take,p);const ps=p.start*spb,fsec=fromBeat*spb,vopts={vibRate:5.5,vibDepth:0,fs:v.fs||1,vol:1};
-   perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+n.s,full=n.e-n.s,off=Math.max(0,fsec-a),dur=full-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
+   perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+n.s,off=Math.max(0,fsec-a),dur=n.e-n.s-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
     if(!n.k){later(st,()=>sink.push(...breathNode(c,vg,st,dur,1)));return}
-    const k0=Math.round((n.s+off/full*(n.e-n.s))/perf.hop),k1=Math.max(k0+2,Math.round(n.e/perf.hop));const cur=new Float32Array(k1-k0);
+    const k0=Math.round((n.s+off)/perf.hop),k1=Math.max(k0+2,Math.round(n.e/perf.hop));const cur=new Float32Array(k1-k0);
     for(let k=k0;k<k1;k++){const m=perf.vals[k];cur[k-k0]=hz(m==null||isNaN(m)?n.p:m)}
     later(st,()=>sink.push(...vocalNote(c,vg,st,dur,hz(n.p),0,{...vopts,curve:cur,vowel:(n.w||'a').charCodeAt(0)%5,consonant:n.k!==2&&off===0})))});
   }else{
