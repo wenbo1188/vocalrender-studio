@@ -170,7 +170,7 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .quick b{color:var(--fg);font-weight:500}
 .quick .st{display:flex;align-items:center;gap:6px}
 .quick .n{width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--accent-fg);font-size:10.5px;display:grid;place-items:center;font-weight:600}
-.quick .x{margin-left:auto}
+.quick .x{margin-left:0}
 .toolbar{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:thin;flex:none}
 .seg{display:flex;background:var(--raised);border:1px solid var(--line);border-radius:7px;padding:2px;gap:2px;flex:none}
 .seg .btn{height:26px}
@@ -256,6 +256,24 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .lyricbar input{flex:1;min-width:160px;height:30px;border:1px solid var(--line-2);border-radius:6px;background:var(--raised);padding:0 10px}
 .lyricbar .cnt{font-size:11.5px;color:var(--fg-3);flex:none}
 .lyricbar .cnt.bad{color:var(--err)}
+.lyricbar .cnt.warn{color:var(--warn)}
+.lyricbar .cnt{max-width:46%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nl.pv{background:var(--raised);color:var(--accent);box-shadow:0 0 0 1.5px var(--accent);font-weight:600}
+.note.pvt{box-shadow:0 0 0 1.5px var(--accent),inset 0 0 0 1px rgba(0,0,0,.12)}
+/* ---------- first-run tour ---------- */
+.tour{position:fixed;inset:0;z-index:80}
+.tour-hole{position:fixed;border-radius:8px;box-shadow:0 0 0 9999px rgba(10,12,18,.55);transition:all .25s ease;pointer-events:none;outline:2px solid var(--accent);outline-offset:2px}
+.tour-hole.none{box-shadow:0 0 0 9999px rgba(10,12,18,.55);width:0!important;height:0!important;outline:0}
+.tour-card{position:fixed;width:min(340px,calc(100vw - 32px));background:var(--dialog,var(--raised));color:var(--fg);border:1px solid var(--line-2);border-radius:10px;box-shadow:0 18px 48px rgba(0,0,0,.3);padding:16px 18px 14px;transition:top .25s ease,left .25s ease}
+.tour-card h3{margin:2px 0 8px;font-size:15.5px;font-weight:600}
+.tour-card .tb{font-size:13px;line-height:1.7;color:var(--fg-2)}
+.tour-card .tb ul{margin:6px 0 0;padding-left:18px}.tour-card .tb li{margin:2px 0}
+.tour-card .tb b{color:var(--fg)}
+.tour-card kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--raised)}
+.tour-step{font-size:11px;color:var(--fg-3);display:flex;gap:4px;align-items:center}
+.tour-step i{width:6px;height:6px;border-radius:50%;background:var(--line-2)}.tour-step i.on{background:var(--accent);width:16px;border-radius:3px}
+.tour-foot{display:flex;gap:8px;align-items:center;margin-top:14px}.tour-foot .sp{flex:1}
+@media (prefers-reduced-motion:reduce){.tour-hole,.tour-card{transition:none}}
 /* ---------- inspector ---------- */
 .tabs{display:flex;border-bottom:1px solid var(--line);padding:0 6px;flex:none}
 .tab{flex:1;height:38px;border:0;background:transparent;color:var(--fg-3);font-size:12.5px;border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -565,6 +583,7 @@ html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
         <span class="st"><span class="n">1</span><b>选声线</b>左侧挑一个参考声线</span>
         <span class="st"><span class="n">2</span><b>写旋律</b>拖动音符改音高，拖右边缘改时值，双击填词</span>
         <span class="st"><span class="n">3</span><b>渲染</b>按乐句生成，可多版本对比</span>
+        <button class="btn line" id="quickTour" style="margin-left:auto;height:26px">新手引导</button>
         <button class="btn icon x" id="quickX" title="关闭提示"></button>
       </div>
       <div class="toolbar">
@@ -603,8 +622,9 @@ html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
       </div>
       <div class="lyricbar">
         <label for="lyricIn">批量歌词</label>
-        <input id="lyricIn" placeholder="输入中文歌词，例如：晚风吹过旧街口。休止用 SP 表示" autocomplete="off">
+        <input id="lyricIn" placeholder="输入一句或整首歌词，按顺序每个音填一个字；先选中音符可只填那一段" autocomplete="off">
         <span class="cnt" id="lyricCnt"></span>
+        <button class="btn icon" id="lyricHelp" title="批量歌词怎么用">?</button>
         <button class="btn line" id="lyricFill">填入音符</button>
       </div>
     </section>
@@ -857,7 +877,7 @@ function renderKeys(){
 }
 function renderRoll(){
  const W=contentBeats()*S.ppb,H=ROWS*S.rowH;content.style.width=W+'px';content.style.height=H+'px';gridBg();
- const v=voiceObj();let h='';
+ const v=voiceObj(),pv=lyricPreview();let h='';
  const yTop=(MAXP-v.range[1])*S.rowH,yBot=(MAXP-v.range[0]+1)*S.rowH;
  h+=`<div class="outband" style="top:0;height:${yTop}px"></div><div class="outband" style="top:${yBot}px;bottom:0"></div>`;
  h+=refSVG(W,H);
@@ -865,8 +885,8 @@ function renderRoll(){
  S.events.forEach((e,i)=>{const x=D.starts[i]*S.ppb,w=beats(e)*S.ppb;const sel=S.sel.has(e.id);
   if(e.kind!=='note'){const inph=e.kind==='rest'&&D.pOf[i];h+=`<div class="rest${e.kind==='breath'?' breath':''}${inph?' inph':''}${sel?' sel':''}${erasing(e)?' erasing':''}" data-i="${i}" style="left:${x}px;width:${w}px" title="${e.kind==='breath'?'换气 AP':'休止 SP'} · ${NV[e.dur].n}${inph?` · 在乐句 P${inph.n} 内，这里不断句`:e.kind==='rest'?' · 在这里断句':''}${e.seg==='join'?'（手动合并）':e.seg==='break'?'（手动断句）':''}"><span class="rl">${e.kind==='breath'?(w>=64?'AP 换气':'AP'):'SP'+(e.seg==='join'?' · 合并':inph&&w>=64?' · 句内':'')}</span></div>`;return}
   const y=(MAXP-e.pitch)*S.rowH;const mel=e.word==='-';
-  const cls=['note',mel?'mel':'',sel?'sel':'',erasing(e)?'erasing':'',PREFS.scaleHL&&D.key&&!inKey(e.pitch)?'ook':'',D.errIdx.has(i)?'err':'',D.warnIdx.has(i)?'warn':''].join(' ');
-  h+=`<div class="${cls}" data-i="${i}" style="left:${x+1}px;top:${y}px;width:${Math.max(4,w-2)}px;height:${S.rowH-1}px" title="${esc(e.word)} · ${pname(e.pitch)} · ${NV[e.dur].n}"><span class="edge"></span></div><span class="nl${mel?' mel':''}${sel?' sel':''}${erasing(e)?' erasing':''}" data-i="${i}" style="left:${x+3}px;top:${y+2}px;height:${S.rowH-5}px;max-width:${Math.max(0,w-10)}px">${mel?'–':esc(e.word||'?')}</span>`;
+  const cls=['note',mel?'mel':'',sel?'sel':'',erasing(e)?'erasing':'',pv&&pv.has(i)?'pvt':'',PREFS.scaleHL&&D.key&&!inKey(e.pitch)?'ook':'',D.errIdx.has(i)?'err':'',D.warnIdx.has(i)?'warn':''].join(' ');
+  h+=`<div class="${cls}" data-i="${i}" style="left:${x+1}px;top:${y}px;width:${Math.max(4,w-2)}px;height:${S.rowH-1}px" title="${esc(e.word)} · ${pname(e.pitch)} · ${NV[e.dur].n}"><span class="edge"></span></div><span class="nl${mel?' mel':''}${sel?' sel':''}${erasing(e)?' erasing':''}${pv&&pv.has(i)?' pv':''}" data-i="${i}" style="left:${x+3}px;top:${y+2}px;height:${S.rowH-5}px;max-width:${Math.max(0,w-10)}px"${pv&&pv.has(i)?` title="原来是“${esc(e.word)}”"`:''}>${pv&&pv.has(i)?esc(pv.get(i)):mel?'–':esc(e.word||'?')}</span>`;
  });
  if(drag&&drag.mode==='resize'){const i=drag.i,x0=D.starts[i]*S.ppb;
   h+=`<div class="ticks" style="left:${x0}px;top:${(MAXP-S.events[i].pitch)*S.rowH-8}px;width:0">${NV.map((n,k)=>`<i class="${k===S.events[i].dur?'on':''}" style="left:${n.b*S.ppb}px"></i>`).join('')}<b style="left:${NV[S.events[i].dur].b*S.ppb}px">${NV[S.events[i].dur].l}</b></div>`}
@@ -1210,7 +1230,7 @@ function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{
  const s=$('#saveSt');if(s)s.textContent=(isDirty()?'有未保存的更改 · ':'')+'已自动保存 '+new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});},400)}
 function renderAll(o={}){
  derive();renderRoll();renderRuler();renderLanes();renderKeys();
- if(!o.skipInsp)renderInspector();renderStatus();renderTopbar();persist();scheduleAuto();
+ if(!o.skipInsp)renderInspector();renderStatus();renderTopbar();persist();scheduleAuto();updLyricCnt();
 }
 
 /* ================= scroll sync ================= */
@@ -1414,17 +1434,37 @@ function moveSel(d){const ix=selIdx();let i=ix.length?(d>0?Math.max(...ix):Math.
 function scrollToIdx(i){const x=D.starts[i]*S.ppb;if(x<roll.scrollLeft+40||x>roll.scrollLeft+roll.clientWidth-80)roll.scrollLeft=x-roll.clientWidth/3;const e=S.events[i];if(e.kind==='note'){const y=(MAXP-e.pitch)*S.rowH;if(y<roll.scrollTop||y>roll.scrollTop+roll.clientHeight-S.rowH)roll.scrollTop=y-roll.clientHeight/2}}
 
 /* lyrics bar */
-function lyricInfo(){const toks=tokenize($('#lyricIn').value).filter(t=>t!=='-');const words=toks.filter(t=>t!=='SP'&&t!=='AP');const slots=S.events.filter(e=>e.kind==='note'&&e.word!=='-').length;return{toks,words,slots}}
-function updLyricCnt(){const{words,slots}=lyricInfo();const c=$('#lyricCnt');if(!words.length){c.textContent=S.events.length?`当前 ${slots} 个可填字的音符`:'';c.className='cnt';return}
- if(!slots){c.textContent=`${words.length} 个字，将生成四分音符`;c.className='cnt';return}
- c.textContent=`${words.length} 个字 / ${slots} 个音符`;c.className='cnt'+(words.length!==slots?' bad':'')}
-$('#lyricIn').addEventListener('input',updLyricCnt);
-$('#lyricIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('#lyricFill').click()});
+// Batch lyrics. Which notes take the characters:
+//  nothing selected -> every note from the first; one note selected -> from that note on; several -> only those.
+// Melisma notes ("-") and rests take no character. Fewer characters leave the remaining notes as they are; extra ones are ignored.
+function lyricInfo(){const toks=tokenize($('#lyricIn').value).filter(t=>t!=='-'),words=toks.filter(t=>t!=='SP'&&t!=='AP');
+ const slotOK=e=>e.kind==='note'&&e.word!=='-',sel=selIdx().filter(i=>slotOK(S.events[i]));let targets,scope;
+ if(sel.length>1){targets=sel;scope='sel'}
+ else if(sel.length===1){targets=S.events.map((e,i)=>i).filter(i=>i>=sel[0]&&slotOK(S.events[i]));scope='from'}
+ else{targets=S.events.map((e,i)=>i).filter(i=>slotOK(S.events[i]));scope='all'}
+ return{toks,words,targets,scope,slots:targets.length}}
+function lyricPreview(){const v=$('#lyricIn').value.trim();if(!v)return null;const{words,targets}=lyricInfo();if(!targets.length)return null;
+ const m=new Map();targets.forEach((i,k)=>{if(k<words.length)m.set(i,words[k])});return m}
+function updLyricCnt(){const{words,slots,scope,targets}=lyricInfo(),c=$('#lyricCnt');c.className='cnt';
+ const where=scope==='sel'?`选中的 ${slots} 个音`:scope==='from'?`从选中的音到结尾（${slots} 个音）`:`从第 1 个音开始（共 ${slots} 个音）`;
+ if(!words.length){c.textContent=S.events.length?(scope==='all'?`共 ${slots} 个可填字的音 · 选中音符可只填一段`:`将填入${where}`):'卷帘为空：每个字会生成一个四分音符';c.title=c.textContent;return}
+ if(!S.events.some(e=>e.kind==='note')){c.textContent=`${words.length} 个字 → 生成 ${words.length} 个四分音符`;c.title=c.textContent;return}
+ const n=Math.min(words.length,slots);
+ c.textContent=`${words.length} 字 → ${scope==='sel'?'选中的音':scope==='from'?'从选中的音起':'从第 1 个音起'}填 ${n} 个`+(words.length<slots?` · 余下 ${slots-words.length} 个音不变`:words.length>slots?` · 多出 ${words.length-slots} 字被忽略`:' · 正好填满');
+ if(words.length>slots)c.className='cnt warn';c.title=c.textContent}
+$('#lyricIn').addEventListener('input',()=>{updLyricCnt();renderRoll();const pv=lyricPreview();if(pv&&pv.size===1)scrollToIdx([...pv.keys()][0])});
+$('#lyricIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('#lyricFill').click();else if(e.key==='Escape'){e.target.value='';updLyricCnt();renderRoll()}});
+$('#lyricHelp').onclick=()=>startTour(TOUR.findIndex(t=>t.id==='lyrics'));
 $('#lyricFill').addEventListener('click',()=>{
- const{toks,words,slots}=lyricInfo();if(!toks.length)return toast('先输入歌词');
- if(!slots){commit(()=>{let p=64;S.events=toks.map(t=>t==='SP'?{id:uid(),kind:'rest',word:'SP',pitch:0,dur:6}:t==='AP'?{id:uid(),kind:'breath',word:'AP',pitch:0,dur:4}:{id:uid(),kind:'note',word:t,pitch:p,dur:6})});toast(`已生成 ${words.length} 个四分音符，拖动音符调整旋律`);return}
- if(words.length!==slots)return toast(`歌词 ${words.length} 个字，但有 ${slots} 个需要填字的音符（连音和休止不计）。请补齐或删减后再填入。`,'err');
- commit(()=>{let k=0;S.events.forEach(e=>{if(e.kind==='note'&&e.word!=='-')e.word=words[k++]})});toast('歌词已按顺序填入');
+ const{toks,words,targets,scope,slots}=lyricInfo();if(!toks.length)return toast('先在输入框里写歌词');
+ if(!S.events.some(e=>e.kind==='note')){commit(()=>{let p=64;S.events=toks.map(t=>t==='SP'?{id:uid(),kind:'rest',word:'SP',pitch:0,dur:6}:t==='AP'?{id:uid(),kind:'breath',word:'AP',pitch:0,dur:4}:{id:uid(),kind:'note',word:t,pitch:p,dur:6})});
+  $('#lyricIn').value='';updLyricCnt();renderRoll();return toast(`已生成 ${words.length} 个四分音符，拖动音符调整旋律`)}
+ if(!words.length)return toast('没有可填的字（SP / AP 只在卷帘为空时生成休止和换气）');
+ if(!slots)return toast('选中的音符里没有可以填字的音（连音“-”不占字）','err');
+ const n=Math.min(words.length,slots);
+ commit(()=>{for(let k=0;k<n;k++)S.events[targets[k]].word=words[k]});
+ $('#lyricIn').value='';updLyricCnt();renderRoll();scrollToIdx(targets[0]);
+ toast(`已填入 ${n} 个字${scope==='sel'?'（选中的音）':scope==='from'?'（从选中的音开始）':''}${words.length<slots?`，后面 ${slots-words.length} 个音保持原样`:''}${words.length>slots?`，多出的 ${words.length-slots} 个字没有用上`:''}，Ctrl+Z 可撤销`);
 });
 
 /* ================= audio ================= */
@@ -1826,7 +1866,7 @@ const MENUS={
   ['导入乐谱（MIDI / JSON）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],['导出乐谱（MIDI）…','',()=>exportScore('mid')],['导出乐谱（VocalRender JSON）…','',()=>exportScore('json')],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
  edit:()=>[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending],0,
   ['移调…','K',()=>transposeDlg()],0,['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.alignAudio?'✓ ':'')+'人声对齐到乐谱节奏','',()=>{PREFS.alignAudio=!PREFS.alignAudio;savePrefs();renderInspector();toast(PREFS.alignAudio?'播放和导出时人声对齐到乐谱节奏':'播放和导出使用模型原始节奏')}],[(PREFS.autoRender?'✓ ':'')+'改动后自动渲染','',()=>{PREFS.autoRender=!PREFS.autoRender;savePrefs();renderInspector();renderStatus();if(PREFS.autoRender){toast('停止编辑约 3 秒后自动渲染改动的乐句');scheduleAuto()}else toast('已关闭自动渲染')}],0,[(PREFS.scaleHL?'✓ ':'')+'高亮调内音','',()=>{PREFS.scaleHL=!PREFS.scaleHL;savePrefs();renderAll()}],[(PREFS.scaleSnap?'✓ ':'')+'拖动时吸附调内音','',()=>{PREFS.scaleSnap=!PREFS.scaleSnap;savePrefs();renderAll()}],[(PREFS.segLines?'✓ ':'')+'显示乐句边界线','',()=>{PREFS.segLines=!PREFS.segLines;savePrefs();renderRoll()}],0,[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
- help:[['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
+ help:[['新手引导','',()=>startTour(0)],['批量歌词怎么用','',()=>startTour(TOUR.findIndex(t=>t.id==='lyrics'))],0,['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
 let openMenu=null;
 // items: [label, shortcut, action, disabled] or 0 for a separator
 function popMenu(items,x,y){if(openMenu){openMenu.remove();openMenu=null}
@@ -2250,6 +2290,51 @@ function encodeWav(buf,bits){
  return new Uint8Array(ab);
 }
 
+/* ================= first-run tour ================= */
+const TOUR_VER=1;
+const TOUR=[
+ {id:'hi',t:null,h:'欢迎使用 VocalRender Studio',b:`用乐谱生成歌声，三步就够：<ul><li><b>选声线</b>：决定谁来唱</li><li><b>写旋律和歌词</b>：在卷帘上画音符、填字</li><li><b>渲染</b>：把乐谱交给模型生成</li></ul><p style="margin:8px 0 0">接下来花一分钟认识各个区域。随时可以按 <kbd>Esc</kbd> 跳过，之后在 <b>帮助 → 新手引导</b> 再看一遍。</p>`},
+ {id:'voice',t:'#side',h:'① 选参考声线',b:`左侧挑一个内置声线，或者上传一段 2–8 秒的清唱，作为音色参考。<ul><li>点 ▶ 试听参考音频</li><li>键盘旁的蓝条是这个声线的建议音域</li></ul>`},
+ {id:'roll',t:'#roll',h:'② 在卷帘上写旋律',b:`每个色块是一个音，块上的字是歌词。<ul><li><b>上下拖</b>改音高，<b>拖右边缘</b>改时值</li><li><b>双击</b>音符输入歌词，<kbd>Tab</kbd> 跳到下一个</li><li>在空白处<b>拖动框选</b>，<kbd>Delete</kbd> 删除</li><li>右键有更多操作：断句、合并、移调等</li></ul>`},
+ {id:'tools',t:'.toolbar',h:'工具栏',b:`选择 <kbd>V</kbd>、铅笔 <kbd>B</kbd>、橡皮 <kbd>E</kbd>，以及插入音符、休止（SP）、连音（一字多音）和换气（AP）。时值只能是模型支持的 12 种音符，拖动时会自动吸附。`},
+ {id:'lyrics',t:'.lyricbar',demo:'我们一起唱歌吧',h:'批量歌词',b:`一次给一整句或整首歌填词，按顺序<b>每个音填一个字</b>：<ul><li><b>没选音符</b>：从第一个音开始填</li><li><b>选中一个音</b>：从这个音往后填</li><li><b>选中一段</b>（框选，或点上方的乐句条）：只填这一段</li><li>连音（“–”）和休止不占字，标点和空格会被忽略</li><li>字少了，后面的音保持原样；字多了，多出的会被忽略</li></ul><p style="margin:8px 0 0">输入时，卷帘上会用<b>蓝框</b>预览每个字落在哪个音上（现在显示的就是示例）。按 <kbd>Enter</kbd> 或“填入音符”确认。卷帘为空时，每个字会生成一个四分音符。</p>`},
+ {id:'ruler',t:'#ruler',h:'标尺和乐句',b:`<ul><li><b>点击或拖动标尺</b>移动播放头，双击从那里开始播放</li><li>下面的色条是<b>乐句</b>：每一句单独提交生成，颜色表示状态（未渲染 / 已渲染 / 已修改）</li><li>右键乐句条可以合并、渲染或删除整句</li></ul>`},
+ {id:'transport',t:'.transport',h:'播放',b:`<kbd>Space</kbd> 播放 / 停止。旁边两个开关是“停止后回到起点”和“跟随翻页”。单击时间码（或 <kbd>Ctrl+G</kbd>）可以输入要跳到的小节，比如 <b>5.2</b>。没渲染的乐句用钢琴音播放旋律。`},
+ {id:'render',t:'#btnRender',h:'③ 渲染',b:`把未渲染和改动过的乐句交给模型生成（<kbd>Ctrl+R</kbd>），从播放头附近开始。现在是<b>演示服务</b>，人声是模拟的；在右边的 ⚙ 里填上你的 VocalRender 服务地址，就会生成真实歌声。`},
+ {id:'insp',t:'#insp',h:'检查器',b:`<ul><li><b>属性</b>：选中音符的歌词、音高、时值；工程的调性和移调</li><li><b>生成</b>：分句方式、表现风格和生成参数</li><li><b>版本</b>：同一句可以生成多个版本对比挑选，播放时按 <kbd>T</kbd> 切换</li><li><b>接口</b>：每一句实际发给服务的请求</li></ul>`},
+ {id:'status',t:'#status',h:'状态栏',b:`这里显示乐谱检查结果，比如歌词不是中文、超出音域。点一下可以逐条跳到问题位置。<p style="margin:8px 0 0">按 <kbd>?</kbd> 查看全部快捷键。开始创作吧！</p>`}];
+let tourAt=-1,tourEl=null,tourSavedLyric=null;
+function startTour(at=0){if(at<0)at=0;closeTour(false);if(openMenu){openMenu.remove();openMenu=null}if(!$('#overlay').hidden)closeDialog();
+ tourEl=document.createElement('div');tourEl.className='tour';tourEl.innerHTML=`<div class="tour-hole"></div><div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tourH"><div class="tour-step" id="tourStep"></div><h3 id="tourH"></h3><div class="tb" id="tourB"></div><div class="tour-foot"><button class="btn" data-t="skip">跳过引导</button><span class="sp"></span><button class="btn line" data-t="prev">上一步</button><button class="btn primary" data-t="next">下一步</button></div></div>`;
+ document.body.appendChild(tourEl);
+ tourEl.addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;const a=b.dataset.t;if(a==='skip')closeTour(true);else if(a==='prev')tourGo(tourAt-1);else if(tourAt>=TOUR.length-1)closeTour(true,true);else tourGo(tourAt+1)});
+ tourGo(at)}
+function tourGo(i){if(!tourEl)return;tourStepLeave();tourAt=Math.max(0,Math.min(TOUR.length-1,i));const st=TOUR[tourAt];
+ if(st.demo&&!$('#lyricIn').value.trim()&&S.events.some(e=>e.kind==='note')){tourSavedLyric='';$('#lyricIn').value=st.demo;S.sel.clear();updLyricCnt();renderRoll();const pv=lyricPreview();if(pv&&pv.size)scrollToIdx([...pv.keys()][0])}
+ if(st.id==='insp'&&innerWidth<=980)$('#app').classList.add('show-insp');
+ if(st.id==='voice'&&innerWidth<=720)$('#app').classList.add('show-side');
+ tourEl.querySelector('#tourStep').innerHTML=TOUR.map((_,k)=>`<i class="${k===tourAt?'on':''}"></i>`).join('')+`<span style="margin-left:6px">${tourAt+1} / ${TOUR.length}</span>`;
+ tourEl.querySelector('#tourH').textContent=st.h;tourEl.querySelector('#tourB').innerHTML=st.b;
+ tourEl.querySelector('[data-t="prev"]').hidden=tourAt===0;tourEl.querySelector('[data-t="skip"]').hidden=tourAt===TOUR.length-1;tourEl.querySelector('[data-t="next"]').textContent=tourAt===TOUR.length-1?'开始使用':'下一步';
+ tourPlace();tourEl.querySelector('[data-t="next"]').focus({preventScroll:true})}
+function tourStepLeave(){if(tourSavedLyric!=null){$('#lyricIn').value=tourSavedLyric;tourSavedLyric=null;updLyricCnt();renderRoll()}$('#app').classList.remove('show-insp','show-side')}
+// spotlight the step's area and put the card beside it, wherever there is room
+function tourPlace(){if(!tourEl)return;const st=TOUR[tourAt],hole=tourEl.querySelector('.tour-hole'),card=tourEl.querySelector('.tour-card');
+ const el=st.t&&document.querySelector(st.t),r=el&&el.getBoundingClientRect(),W=innerWidth,H=innerHeight,cw=card.offsetWidth,ch=card.offsetHeight,G=14;
+ if(!r||r.width<2||r.height<2){hole.classList.add('none');Object.assign(hole.style,{left:W/2+'px',top:H/2+'px'});card.style.left=(W-cw)/2+'px';card.style.top=Math.max(16,(H-ch)/2)+'px';return}
+ hole.classList.remove('none');const P=6;Object.assign(hole.style,{left:r.left-P+'px',top:r.top-P+'px',width:r.width+2*P+'px',height:r.height+2*P+'px'});
+ const room={right:W-r.right-G,left:r.left-G,bottom:H-r.bottom-G,top:r.top-G};let x,y;
+ if(room.right>=cw+16){x=r.right+G;y=r.top}else if(room.left>=cw+16){x=r.left-G-cw;y=r.top}
+ else if(room.bottom>=ch+16){x=r.left;y=r.bottom+G}else if(room.top>=ch+16){x=r.left;y=r.top-G-ch}
+ else{x=r.right-cw-24;y=r.top+24}   // the area fills the screen: card goes inside its corner
+ card.style.left=Math.max(16,Math.min(W-cw-16,x))+'px';card.style.top=Math.max(16,Math.min(H-ch-16,y))+'px'}
+function closeTour(done,finished){if(!tourEl)return;tourStepLeave();tourEl.remove();tourEl=null;tourAt=-1;
+ if(done){store.set('vrstudio.tour',TOUR_VER);toast(finished?'随时可以在“帮助 → 新手引导”再看一遍':'已跳过引导，可以在“帮助 → 新手引导”再打开')}}
+addEventListener('resize',()=>{if(tourEl)tourPlace()});
+document.addEventListener('keydown',e=>{if(!tourEl)return;e.stopPropagation();
+ if(e.key==='Escape'){e.preventDefault();closeTour(true)}else if(e.key==='ArrowRight'||e.key==='Enter'&&e.target.tagName!=='BUTTON'){e.preventDefault();tourAt>=TOUR.length-1?closeTour(true,true):tourGo(tourAt+1)}
+ else if(e.key==='ArrowLeft'){e.preventDefault();tourGo(tourAt-1)}},true);
+
 /* ================= wiring ================= */
 function setTool(t){S.tool=t;$$('[data-tool]').forEach(b=>b.classList.toggle('on',b.dataset.tool===t));content.style.cursor=t==='pencil'?'crosshair':t==='eraser'?'cell':'default'}
 $$('[data-tool]').forEach(b=>{b.innerHTML=icon(b.dataset.tool);b.onclick=()=>setTool(b.dataset.tool)});
@@ -2397,12 +2482,15 @@ const mq=matchMedia('(prefers-color-scheme: dark)');(mq.addEventListener?mq.addE
 let rz=0;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{renderVoices();renderLanes();renderInspector()},150)});
 
 /* ================= boot ================= */
+$('#quickTour').onclick=()=>startTour(0);
 setTool('select');renderVoices();
 // seed demo takes for the first two phrases so the opening view shows the full workflow (example data)
 derive();
 if(!saved){D.phrases.slice(0,2).forEach((p,k)=>{const r=rec(p.key);const mk=(n,seed)=>({id:'t'+n+p.key,n,seed,hash:p.hash,params:genParams(),ckpt:S.ckpt,voice:voiceObj().name,at:Date.now()-((3-n)*60000),snap:snapshotOf(p)});r.takes=k===0?[mk(1,73021),mk(2,511984)]:[mk(1,90311)];r.active=r.takes[r.takes.length-1].id})}
 {const f=S.events.find(e=>e.word==='我')||S.events.find(e=>e.kind==='note');if(f){S.sel=new Set([f.id]);S.anchor=f.id}}
 renderAll();
+// first visit: walk through the main areas once
+if(!(store.get('vrstudio.tour')>=TOUR_VER))setTimeout(()=>{if($('#overlay').hidden&&!tourEl)startTour(0)},700);
 requestAnimationFrame(()=>{const ps=S.events.filter(e=>e.kind==='note').map(e=>e.pitch);const avg=ps.length?ps.reduce((a,b)=>a+b)/ps.length:64;roll.scrollTop=(MAXP-avg)*S.rowH-roll.clientHeight/2;renderLanes()});
 updLyricCnt();
 })();
