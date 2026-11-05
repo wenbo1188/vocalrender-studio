@@ -321,6 +321,18 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .dlg header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
 .dlg header h2{margin:0;font-size:15px;font-weight:500}
 .dlg .body{padding:16px}
+.pband .pu{position:absolute;left:0;bottom:0;height:2px;background:var(--fg-3);opacity:.35}
+.pband .pu.hi{background:var(--warn);opacity:.9}
+.segline{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed color-mix(in srgb,var(--accent) 75%,transparent);pointer-events:none;z-index:2}
+.note.ook{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 2px,transparent 2px 6px)}
+.segprev{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px;font-variant-numeric:tabular-nums}
+.segprev th{font-weight:500;color:var(--fg-3);text-align:right;padding:3px 4px}.segprev th:first-child,.segprev td:first-child{text-align:left}
+.segprev td{padding:4px;text-align:right;border-top:1px solid var(--line)}.segprev tr.cur td{color:var(--accent);font-weight:600}
+.chk{gap:8px;font-size:12.5px;margin:4px 0}
+.fld>label.chk{justify-content:flex-start;align-items:center;color:var(--fg);font-size:12.5px}
+.pgen{margin:0 0 14px;border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:var(--raised)}
+.pgen summary{cursor:pointer;font-size:12.5px;display:flex;gap:8px;align-items:center}
+.take .fav{color:var(--fg-3)}.take .fav.on{color:var(--warn)}
 .tp-grid{display:grid;grid-template-columns:auto 1fr;gap:12px 14px;align-items:center;margin-bottom:14px}
 .tp-grid>.k{font-size:12px;color:var(--fg-2);white-space:nowrap}
 .tp-step{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
@@ -672,7 +684,7 @@ function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1
 function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
 // Editor preferences, remembered per browser / per desktop install
-const PREFS=Object.assign({clickLocate:true,returnOnStop:true,follow:true,showRef:true},store.get('vrstudio.prefs')||{});
+const PREFS=Object.assign({clickLocate:true,returnOnStop:true,follow:true,showRef:true,alignAudio:true,autoRender:false,scaleHL:true,scaleSnap:false,segLines:false},store.get('vrstudio.prefs')||{});
 const savePrefs=()=>store.set('vrstudio.prefs',PREFS);
 
 /* ================= state ================= */
@@ -686,7 +698,8 @@ const S={
  renders:{}, // key -> {takes:[], active, job}
  customVoices:[], backing:null,
  mix:{vMute:false,vSolo:false,vVol:.85,bMute:false,bVol:.7},
- service:{mode:'demo',base:'https://your-server.example.com/v1',key:''},
+ service:{mode:'demo',base:'https://your-server.example.com/v1',key:'',conc:1},
+ phraseGen:{}, key:null,
  quickHidden:false, showF0:true};
 const saved=store.get('vrstudio.project');
 if(saved&&Array.isArray(saved.events)&&saved.events.length){
@@ -696,14 +709,16 @@ if(saved&&Array.isArray(saved.events)&&saved.events.length){
  if(saved.renders) S.renders=saved.renders;
  if(saved.refF0) S.refF0=saved.refF0;
  if(Array.isArray(saved.refShift)) S.refShift=saved.refShift;
+ if(saved.phraseGen&&typeof saved.phraseGen==='object') S.phraseGen=saved.phraseGen;
+ if(saved.key) S.key=saved.key;
 }
 S.quickHidden=!!store.get('vrstudio.quickHidden');
 if(store.get('vrstudio.showF0')===false)S.showF0=false;
 let hist=[],redo=[];
-const snap=()=>JSON.stringify({e:S.events,b:S.bpm,r:S.refShift||[]});
+const snap=()=>JSON.stringify({e:S.events,b:S.bpm,r:S.refShift||[],k:S.key||null});
 function pushHist(prev){hist.push(prev);if(hist.length>200)hist.shift();redo=[]}
 function commit(fn){const prev=snap();fn();if(snap()!==prev)pushHist(prev);renderAll()}
-function restore(s){const o=JSON.parse(s);S.events=o.e;S.bpm=o.b;S.refShift=o.r||[];$('#bpm').value=S.bpm;S.sel.clear()}
+function restore(s){const o=JSON.parse(s);S.events=o.e;S.bpm=o.b;S.refShift=o.r||[];S.key=o.k||null;$('#bpm').value=S.bpm;S.sel.clear()}
 function undo(){if(!hist.length)return toast('没有可撤销的操作');redo.push(snap());restore(hist.pop());renderAll()}
 function doRedo(){if(!redo.length)return;hist.push(snap());restore(redo.pop());renderAll()}
 
@@ -716,6 +731,7 @@ function derive(){
  const{phrases,pOf,seg}=segment(starts);
  phrases.forEach((p,n)=>{p.n=n+1;p.text=p.idx.map(i=>S.events[i]).filter(e=>e.kind==='note'&&e.word!=='-').map(e=>e.word).join('');p.req=buildScore(p);p.hash=phraseHash(p)});
  D={starts,total:t,phrases,pOf,seg,byKey:Object.fromEntries(phrases.map(p=>[p.key,p]))};
+ D.key=S.key?{...S.key,sure:true,manual:true}:detectKey(noteIdx(null));
  validate();
  phrases.forEach(p=>p.status=phraseStatus(p));
 }
@@ -776,9 +792,11 @@ function buildScore(p){
  return{item_name:slug()+'_p'+String(p.n).padStart(2,'0'),word,pitch,note,pitch2word,bpm:S.bpm};
 }
 function slug(){const s=S.name.trim();return /^[\w-]+$/.test(s)?s:'proj_'+hashStr(s)}
-function genParams(){const g=S.gen;return{cfg_value:+g.cfg,inference_timesteps:+g.steps,temperature:+g.temp,fsq_temperature:+g.fsq,max_len:+g.maxLen,prompt_max_frames:+g.promptFrames,lyrics_only:!!g.lyricsOnly}}
+// global generation settings, with a phrase's own overrides on top (cfg / temperature / steps / seed)
+function genOf(p){const o=p&&S.phraseGen&&S.phraseGen[p.key];return o?{...S.gen,...o}:S.gen}
+function genParams(p){const g=genOf(p);return{cfg_value:+g.cfg,inference_timesteps:+g.steps,temperature:+g.temp,fsq_temperature:+g.fsq,max_len:+g.maxLen,prompt_max_frames:+g.promptFrames,lyrics_only:!!g.lyricsOnly}}
 function promptAudio(){const v=voiceObj();if(v.kind==='preset')return{preset:v.id};const base=S.service.base.replace(/\/$/,'');return{upload_id:(v.uploads&&v.uploads[base])||'<渲染时先 POST /voices 上传，填入返回的 upload_id>',duration:+v.dur.toFixed(2)}}
-function phraseHash(p){const r={...p.req};delete r.item_name;return hashStr(JSON.stringify([r,S.voice,S.ckpt,genParams()]))}
+function phraseHash(p){const r={...p.req};delete r.item_name;return hashStr(JSON.stringify([r,S.voice,S.ckpt,genParams(p)]))}
 function rec(key){return S.renders[key]||(S.renders[key]={takes:[],active:null,job:null})}
 function activeTake(key){const r=S.renders[key];if(!r||!r.active)return null;return r.takes.find(t=>t.id===r.active)||null}
 function phraseStatus(p){
@@ -815,9 +833,12 @@ function validate(){
 /* ================= rendering: grid ================= */
 const roll=$('#roll'),content=$('#content'),keysIn=$('#keysIn'),rulerIn=$('#rulerIn'),lanesIn=$('#lanesIn');
 function contentBeats(){return Math.max(Math.ceil((D.total+S.bpb*4)/S.bpb)*S.bpb,S.bpb*16)}
+const SCALE={maj:[0,2,4,5,7,9,11],min:[0,2,3,5,7,8,10]};
+const inKey=(p,k=D.key)=>!k||SCALE[k.mode].includes(((p-k.r)%12+12)%12);
 function gridBg(){
- const h=S.rowH,ppb=S.ppb,bar=ppb*S.bpb;let stops=[];
- for(let k=0;k<12;k++){const pitchClass=(12-k)%12;const c=BLACK.has(pitchClass)?'var(--row-b)':'var(--row-w)';
+ const h=S.rowH,ppb=S.ppb,bar=ppb*S.bpb,K=PREFS.scaleHL&&D.key;let stops=[];
+ // with key highlighting, rows show the scale (tonic tinted) instead of the piano's black and white keys
+ for(let k=0;k<12;k++){const pitchClass=(12-k)%12,deg=K?((pitchClass-K.r)%12+12)%12:0;const c=K?(deg===0?'color-mix(in srgb,var(--accent) 9%,var(--row-w))':SCALE[K.mode].includes(deg)?'var(--row-w)':'var(--row-b)'):BLACK.has(pitchClass)?'var(--row-b)':'var(--row-w)';
   stops.push(`${c} ${k*h}px ${(k+1)*h-1}px`,`${k===0?'var(--oct-line)':'var(--row-line)'} ${(k+1)*h-1}px ${(k+1)*h}px`)}
  const layers=[`repeating-linear-gradient(to right,var(--grid-bar) 0 1px,transparent 1px ${bar}px)`,
   `repeating-linear-gradient(to right,var(--grid-beat) 0 1px,transparent 1px ${ppb}px)`];
@@ -844,12 +865,13 @@ function renderRoll(){
  S.events.forEach((e,i)=>{const x=D.starts[i]*S.ppb,w=beats(e)*S.ppb;const sel=S.sel.has(e.id);
   if(e.kind!=='note'){const inph=e.kind==='rest'&&D.pOf[i];h+=`<div class="rest${e.kind==='breath'?' breath':''}${inph?' inph':''}${sel?' sel':''}${erasing(e)?' erasing':''}" data-i="${i}" style="left:${x}px;width:${w}px" title="${e.kind==='breath'?'换气 AP':'休止 SP'} · ${NV[e.dur].n}${inph?` · 在乐句 P${inph.n} 内，这里不断句`:e.kind==='rest'?' · 在这里断句':''}${e.seg==='join'?'（手动合并）':e.seg==='break'?'（手动断句）':''}"><span class="rl">${e.kind==='breath'?(w>=64?'AP 换气':'AP'):'SP'+(e.seg==='join'?' · 合并':inph&&w>=64?' · 句内':'')}</span></div>`;return}
   const y=(MAXP-e.pitch)*S.rowH;const mel=e.word==='-';
-  const cls=['note',mel?'mel':'',sel?'sel':'',erasing(e)?'erasing':'',D.errIdx.has(i)?'err':'',D.warnIdx.has(i)?'warn':''].join(' ');
+  const cls=['note',mel?'mel':'',sel?'sel':'',erasing(e)?'erasing':'',PREFS.scaleHL&&D.key&&!inKey(e.pitch)?'ook':'',D.errIdx.has(i)?'err':'',D.warnIdx.has(i)?'warn':''].join(' ');
   h+=`<div class="${cls}" data-i="${i}" style="left:${x+1}px;top:${y}px;width:${Math.max(4,w-2)}px;height:${S.rowH-1}px" title="${esc(e.word)} · ${pname(e.pitch)} · ${NV[e.dur].n}"><span class="edge"></span></div><span class="nl${mel?' mel':''}${sel?' sel':''}${erasing(e)?' erasing':''}" data-i="${i}" style="left:${x+3}px;top:${y+2}px;height:${S.rowH-5}px;max-width:${Math.max(0,w-10)}px">${mel?'–':esc(e.word||'?')}</span>`;
  });
  if(drag&&drag.mode==='resize'){const i=drag.i,x0=D.starts[i]*S.ppb;
   h+=`<div class="ticks" style="left:${x0}px;top:${(MAXP-S.events[i].pitch)*S.rowH-8}px;width:0">${NV.map((n,k)=>`<i class="${k===S.events[i].dur?'on':''}" style="left:${n.b*S.ppb}px"></i>`).join('')}<b style="left:${NV[S.events[i].dur].b*S.ppb}px">${NV[S.events[i].dur].l}</b></div>`}
  h+=`<div class="phead" id="phGrid" style="left:${S.playhead*S.ppb}px"></div>`;
+ if(PREFS.segLines)D.phrases.forEach((p,k)=>{if(k)h+=`<div class="segline" style="left:${p.start*S.ppb}px"></div>`});
  h+=f0SVG(W,H);
  content.innerHTML=h;
  if(lyrEdit)content.appendChild(lyrEdit.el);
@@ -861,7 +883,8 @@ function renderRuler(){
   for(let k=1;k<S.bpb;k++)h+=`<div class="beat-t" style="left:${(b+k)*S.ppb}px"></div>`}
  S.events.forEach((e,i)=>{if(e.seg==='break'&&e.kind!=='rest')h+=`<div class="segmark" style="left:${D.starts[i]*S.ppb}px" title="手动断句：从这里开始新的一句"></div>`});
  D.phrases.forEach(p=>{const r=S.renders[p.key];const prog=r&&r.job&&r.job.state==='rendering'?r.job.progress:0;
-  h+=`<div class="pband ${p.status}${S.curPhrase===p.key?' cur':''}" data-key="${p.key}" style="left:${p.start*S.ppb+1}px;width:${(p.end-p.start)*S.ppb-2}px" title="乐句 ${p.n} · ${STATUS_TXT[p.status]}"><span class="pd"></span>P${p.n} · ${STATUS_TXT[p.status]}${prog?` ${Math.round(prog*100)}%`:''}${prog?`<span class="pf" style="transform:scaleX(${prog})"></span>`:''}</div>`});
+  const u=Math.max(p.req.word.length/LIMIT_UNITS,p.req.pitch.length/LIMIT_EVENTS),ovr=!!S.phraseGen[p.key],tk=r&&r.takes.length?r.takes.findIndex(t=>t.id===r.active)+1:0;
+  h+=`<div class="pband ${p.status}${S.curPhrase===p.key?' cur':''}" data-key="${p.key}" style="left:${p.start*S.ppb+1}px;width:${(p.end-p.start)*S.ppb-2}px" title="乐句 ${p.n} · ${STATUS_TXT[p.status]} · ${((p.end-p.start)*60/S.bpm).toFixed(1)} 秒 · ${p.req.word.length}/${LIMIT_UNITS} 字 · ${p.req.pitch.length}/${LIMIT_EVENTS} 事件${tk?` · 版本 ${tk}/${r.takes.length}`:''}${ovr?' · 本句单独设置了生成参数':''}"><span class="pd"></span>P${p.n}${ovr?' ⚙':''} · ${STATUS_TXT[p.status]}${prog?` ${Math.round(prog*100)}%`:''}<span class="pu${u>.85?' hi':''}" style="width:${Math.min(100,u*100).toFixed(1)}%"></span>${prog?`<span class="pf" style="transform:scaleX(${prog})"></span>`:''}</div>`});
  if(audio.playing&&PREFS.returnOnStop&&audio.startBeat!=null)h+=`<div class="startmark" style="left:${audio.startBeat*S.ppb}px" title="停止后回到这里"></div>`;
  if(ghostBeat!=null)h+=`<div class="ghost" id="rGhost" style="left:${ghostBeat*S.ppb}px"><span>${posStr(ghostBeat)}</span></div>`;
  h+=`<div class="phead" id="phRuler" style="left:${S.playhead*S.ppb}px"></div>`;
@@ -1053,7 +1076,8 @@ function propsHTML(){
  return `<div class="fld"><div class="lab">工程</div><div class="card" style="font-size:12px;line-height:1.8">
    <div class="row" style="justify-content:space-between"><span>速度</span><span class="mono">${S.bpm} BPM · ${S.bpb===6?'6/8':S.bpb+'/4'}</span></div>
    <div class="row" style="justify-content:space-between"><span>时长</span><span class="mono">${fmtTime(D.total*60/S.bpm)}</span></div>
-   <div class="row" style="justify-content:space-between"><span>调性（推测）</span><span>${(k=>k?keyName(k)+(k.sure?'':' ?'):'—')(detectKey(noteIdx(null)))} <button class="btn line" data-act="transpose" style="height:22px;padding:0 8px;margin-left:4px">移调…</button></span></div>
+   <div class="row" style="justify-content:space-between"><span>调性</span><span class="row" style="gap:4px"><select class="inp" id="keySel" aria-label="调性" style="height:24px;width:auto;padding:0 4px;font-size:12px"><option value="auto">自动 · ${(k=>k?keyName(k)+(k.sure?'':'?'):'—')(detectKey(noteIdx(null)))}</option>${['maj','min'].map(m=>Array.from({length:12},(_,r)=>`<option value="${m}${r}" ${S.key&&S.key.mode===m&&S.key.r===r?'selected':''}>${keyName({mode:m,r})}</option>`).join('')).join('')}</select><button class="btn line" data-act="transpose" style="height:24px;padding:0 8px">移调…</button></span></div>
+   <div class="row" style="justify-content:space-between"><label class="row chk"><input type="checkbox" id="scaleHL" ${PREFS.scaleHL?'checked':''}> 高亮调内音</label><label class="row chk"><input type="checkbox" id="scaleSnap" ${PREFS.scaleSnap?'checked':''}> 拖动吸附调内音</label></div>
    <div class="row" style="justify-content:space-between"><span>声线</span><span>${esc(v.name)}</span></div>
    <div class="row" style="justify-content:space-between"><span>模型</span><span>${S.ckpt}</span></div>
    <div class="row" style="justify-content:space-between"><span>输出</span><span>48 kHz · 单声道</span></div></div></div>
@@ -1062,9 +1086,21 @@ function propsHTML(){
   <p class="hint" style="margin-top:12px">点选音符可编辑歌词、音高和时值。模型按乐谱生成，时值以音符类型表示，不需要逐字对齐时长。</p>`;
 }
 function issuesFor(i){const l=D.issues.filter(x=>x.i===i);if(!l.length)return'';return `<div style="margin-top:12px">${l.map(x=>`<div class="issue ${x.lv}" style="cursor:default"><span class="ic"></span><span>${esc(x.msg)}</span></div>`).join('')}</div>`}
+// What each phrasing mode would give right now: phrases, longest, and how many still need rendering (reused takes don't)
+function simulateSeg(mode){const keep=S.gen.segMode;S.gen.segMode=mode;let r;try{r=segment(D.starts)}finally{S.gen.segMode=keep}
+ r.phrases.forEach((p,n)=>{p.n=n+1;p.req=buildScore(p);p.hash=phraseHash(p)});
+ const need=r.phrases.filter(p=>p.idx.some(i=>S.events[i].kind==='note')&&!((S.renders[p.key]||{takes:[]}).takes.some(t=>t.hash===p.hash)));
+ const secs=r.phrases.map(p=>(p.end-p.start)*60/S.bpm);
+ return{n:r.phrases.length,max:secs.length?Math.max(...secs):0,need:need.length,needSec:need.reduce((a,p)=>a+(p.end-p.start)*60/S.bpm,0)}}
+const SEG_LABEL={rest:'每个休止断句',short:'短休止不断',long:'尽量长段'};
 function segHTML(){const g=S.gen,ph=D.phrases,secs=ph.map(p=>(p.end-p.start)*60/S.bpm),avg=secs.length?secs.reduce((a,b)=>a+b)/secs.length:0,mx=secs.length?Math.max(...secs):0;
- return `<div class="fld"><div class="lab">分句方式 <span class="hint">每一句单独提交生成</span></div>
+ return `<div class="fld"><div class="lab">播放与渲染</div>
+  <label class="row chk"><input type="checkbox" id="alignAudio" ${PREFS.alignAudio?'checked':''}> 人声对齐到乐谱节奏（播放和导出）</label>
+  <p class="hint" style="margin:0 0 6px 24px">模型按自己的节奏唱：开头有静音，休止和换气会变长或变短。开启后按每个音的位置轻微拉伸（音高不变），配伴奏时更整齐。</p>
+  <label class="row chk"><input type="checkbox" id="autoRender" ${PREFS.autoRender?'checked':''}> 改动后自动渲染（停止编辑约 3 秒后）</label></div>
+  <div class="fld"><div class="lab">分句方式 <span class="hint">每一句单独提交生成</span></div>
   <div class="segs" id="segMode"><button data-seg="rest" class="${g.segMode==='rest'?'on':''}">每个休止断句</button><button data-seg="short" class="${g.segMode==='short'?'on':''}">短休止不断</button><button data-seg="long" class="${g.segMode==='long'?'on':''}">尽量长段</button></div>
+  ${S.events.length?`<table class="segprev"><tr><th>切换后</th><th>句数</th><th>最长</th><th>需渲染</th></tr>${['rest','short','long'].map(m=>{const x=simulateSeg(m);return `<tr class="${g.segMode===m?'cur':''}"><td>${SEG_LABEL[m]}</td><td>${x.n}</td><td>${x.max.toFixed(1)} 秒</td><td>${x.need?`${x.need} 句${estimate(x.needSec)?' · '+estimate(x.needSec):''}`:'无'}</td></tr>`}).join('')}</table>`:''}
   ${g.segMode==='short'?`<div class="row" style="gap:8px;margin-top:8px;font-size:12px"><span>休止短于</span><select class="inp" id="segRest" style="width:auto;height:28px">${[[.5,'半拍'],[1,'1 拍'],[2,'2 拍'],[S.bpb,'1 小节']].map(([v,l])=>`<option value="${v}" ${+g.segRest===v?'selected':''}>${l}</option>`).join('')}</select><span>时不断句，休止留在句子里</span></div>`:''}
   ${g.segMode==='long'?`<div class="row" style="gap:8px;margin-top:8px;font-size:12px"><span>每段最长</span><select class="inp" id="segMax" style="width:auto;height:28px">${[10,15,20,30,45].map(v=>`<option value="${v}" ${+g.segMaxSec===v?'selected':''}>${v} 秒</option>`).join('')}</select><span>，在较长的休止处断开</span></div>`:''}
   <div class="card" style="font-size:12px;line-height:1.75;margin-top:8px">当前 <b>${ph.length}</b> 句 · 平均 ${avg.toFixed(1)} 秒 · 最长 ${mx.toFixed(1)} 秒${D.seg.merged?` · ${D.seg.merged} 处休止留在句内`:''}${D.seg.autoCuts?` · ${D.seg.autoCuts} 处因超过上限自动拆开`:''}
@@ -1083,6 +1119,7 @@ function genHTML(){const g=S.gen;
   <label class="row" style="font-size:12px;gap:8px;margin-bottom:6px"><input type="checkbox" id="gLyricsOnly" ${g.lyricsOnly?'checked':''}> 仅歌词模式（忽略音高、节奏和速度）</label>
  </details>
  <div class="card hint">修改生成参数、模型或声线后，已渲染的乐句会标为“已修改”，需要重新渲染才会生效。</div>`}
+function pslider(k,label,min,max,step,val){return `<div class="fld"><div class="lab"><span>${label}</span><span class="v" id="pv_${k}">${(+val).toFixed(step<1?(step<.1?2:1):0)}</span></div><input type="range" data-pg="${k}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="本句${label}"></div>`}
 function slider(k,label,api,min,max,step,val,hint){return `<div class="fld"><div class="lab"><span>${label} <span class="mono" style="color:var(--fg-3);font-size:10.5px">${api}</span></span><span class="v" id="v_${k}">${(+val).toFixed(step<1?(step<.1?2:1):0)}</span></div><input type="range" data-g="${k}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${label}">${hint?`<p class="hint">${hint}</p>`:''}</div>`}
 function takesHTML(){
  const p=curPhrase();if(!p)return '<div class="empty">还没有乐句。先画一些音符。</div>';
@@ -1093,12 +1130,18 @@ function takesHTML(){
  <div style="font-size:15px;letter-spacing:.06em;margin:4px 0 6px">${esc(p.text||'（换气）')}</div>
  <div class="hint mono">${posStr(p.start)} → ${posStr(p.end)} · ${p.req.pitch.length} 事件 · ${p.req.word.length} 单元</div></div>
  <div class="row" style="margin-bottom:14px"><button class="btn primary" data-act="newtake" style="flex:1" ${busy||st==='error'?'disabled':''}>${r.takes.length?'生成新版本':'渲染此乐句'}</button><button class="btn line" data-act="solo" title="只播放这一句">${icon('play',14)} 试听</button></div>
+
+ ${(()=>{const o=S.phraseGen[p.key],g=genOf(p);return `<details class="pgen" ${o?'open':''}><summary>本句生成参数 ${o?'<span class="tag acc">单独设置</span>':'<span class="hint">跟随全局</span>'}</summary>
+  <label class="row" style="gap:8px;font-size:12.5px;margin:8px 0 10px"><input type="checkbox" id="pgOn" ${o?'checked':''}> 这一句单独设置（其他句子不受影响）</label>
+  ${o?`${pslider('cfg','乐谱遵循度',1,4,.1,g.cfg)}${pslider('temp','表现随机性',.5,1.5,.05,g.temp)}${pslider('steps','扩散步数',4,30,1,g.steps)}
+  <div class="fld"><div class="lab">随机种子</div><div class="segs"><button data-pgseed="random" class="${g.seedMode==='random'?'on':''}">每次随机</button><button data-pgseed="fixed" class="${g.seedMode==='fixed'?'on':''}">固定</button></div>${g.seedMode==='fixed'?`<input class="inp mono" id="pgSeed" type="number" value="${g.seed}" style="margin-top:6px">`:''}</div>
+  <p class="hint">改动后这一句会标为“已修改”，重新渲染才生效。</p>`:''}</details>`})()}
  ${busy?`<div class="card hint" style="margin-bottom:10px">${st==='queued'?'排队中…':'渲染中 '+Math.round(r.job.progress*100)+'%'}<button class="btn" data-act="cancel" style="float:right;height:22px">取消</button></div>`:''}
- <div class="sec-h"><h3>版本 ${r.takes.length?`(${r.takes.length})`:''}</h3>${r.takes.length>1?'<span class="hint">点选设为当前版本</span>':''}</div>
+ <div class="sec-h"><h3>版本 ${r.takes.length?`(${r.takes.length})`:''}</h3>${r.takes.length>1?'<span class="hint">点选设为当前；播放时按 T 切换</span>':''}</div>
  ${r.takes.length?[...r.takes].reverse().map(t=>`<div class="take${t.id===r.active?' act':''}">
    <input type="radio" name="take" data-pick="${t.id}" ${t.id===r.active?'checked':''} aria-label="设为当前版本">
    <div><div class="tn">版本 ${t.n} ${t.hash!==p.hash?'<span class="tag warn">基于旧乐谱</span>':''}</div><div class="tm">seed ${t.seed} · cfg ${t.params.cfg_value} · ${t.ckpt.replace('VocalRender','VR')} · ${t.voice}</div></div>
-   <div class="row"><button class="btn icon" data-playtake="${t.id}" title="试听此版本">${icon('play',14)}</button><button class="btn icon" data-deltake="${t.id}" title="删除此版本">${icon('x',14)}</button></div>
+   <div class="row"><button class="btn icon fav${t.fav?' on':''}" data-fav="${t.id}" title="${t.fav?'取消收藏':'收藏这个版本'} (F)" aria-pressed="${!!t.fav}">${t.fav?'★':'☆'}</button><button class="btn icon" data-playtake="${t.id}" title="试听此版本">${icon('play',14)}</button><button class="btn icon" data-deltake="${t.id}" title="删除此版本">${icon('x',14)}</button></div>
    <canvas data-take="${p.key}|${t.id}"></canvas></div>`).join(''):'<div class="empty">这一句还没有渲染。<br>同一乐谱每次生成都会略有不同，可以多生成几个版本挑选。</div>'}`;
 }
 function apiHTML(){
@@ -1123,7 +1166,7 @@ function apiHTML(){
   <span class="m">POST</span><span class="p">/score/import</span><span class="d">ABC / MusicXML 解析为 word·pitch·note·pitch2word</span>
  </div>`;
 }
-function renderRequest(p){return{checkpoint:S.ckpt,score:p.req,prompt_audio:promptAudio(),generation:{...genParams(),seed:S.gen.seedMode==='fixed'?+S.gen.seed:null},output:{sample_rate:48000,format:'wav'}}}
+function renderRequest(p){const g=genOf(p);return{checkpoint:S.ckpt,score:p.req,prompt_audio:promptAudio(),generation:{...genParams(p),seed:g.seedMode==='fixed'?+g.seed:null},output:{sample_rate:48000,format:'wav'}}}
 function hl(json){return json.replace(/("(?:\\.|[^"\\])*")(\s*:)?|(-?\b\d+(?:\.\d+)?\b)|\b(true|false|null)\b/g,(m,str,colon,num,lit)=>str?(colon?`<span class="k">${esc(str)}</span>${colon}`:`<span class="s">${esc(str)}</span>`):`<span class="n">${num||lit}</span>`)}
 
 /* ================= status + topbar ================= */
@@ -1148,7 +1191,7 @@ function renderStatus(){
   ${cp?`<span class="mono">P${cp.n}: ${cp.req.pitch.length}/${LIMIT_EVENTS} 事件 · ${cp.req.word.length}/${LIMIT_UNITS} 单元</span>`:''}
   ${S.sel.size?`<span>已选 ${S.sel.size}</span>`:''}
   <span class="spacer"></span>
-  ${DESK?`<span>桌面版 v${esc(DESK.info.version||"")}</span>`:""}<span>48 kHz · 单声道 · 中文</span><span>${S.service.mode==='demo'?'演示服务（模拟）':'远程：'+esc(S.service.base)}</span><span id="saveSt" style="color:var(--fg-3)">已自动保存</span>`;
+  ${DESK?`<span>桌面版 v${esc(DESK.info.version||"")}</span>`:""}${PREFS.autoRender?'<span style="color:var(--accent)">自动渲染：开</span>':''}<span>48 kHz · 单声道 · 中文</span><span>${S.service.mode==='demo'?'演示服务（模拟）':'远程：'+esc(S.service.base)}</span><span id="saveSt" style="color:var(--fg-3)">已自动保存</span>`;
 }
 function renderTopbar(){
  const pend=D.phrases.filter(p=>p.status==='none'||p.status==='stale').length;
@@ -1167,7 +1210,7 @@ function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{
  const s=$('#saveSt');if(s)s.textContent=(isDirty()?'有未保存的更改 · ':'')+'已自动保存 '+new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});},400)}
 function renderAll(o={}){
  derive();renderRoll();renderRuler();renderLanes();renderKeys();
- if(!o.skipInsp)renderInspector();renderStatus();renderTopbar();persist();
+ if(!o.skipInsp)renderInspector();renderStatus();renderTopbar();persist();scheduleAuto();
 }
 
 /* ================= scroll sync ================= */
@@ -1239,7 +1282,9 @@ content.addEventListener('pointermove',e=>{
  if(drag.mode==='none'&&Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>5)drag={mode:'marquee',cx0:drag.cx0,cy0:drag.cy0,base:new Set(drag.mods?S.sel:[]),el:null,moved:false};
  if(drag.mode==='marquee'){updateMarquee(e);return}
  if(drag.mode==='pitch'){const dy=Math.round((drag.startY-e.clientY)/S.rowH);if(dy===drag.lastDy)return;drag.lastDy=dy;
-  S.events.forEach((x,k)=>{if(S.sel.has(x.id)&&x.kind==='note')x.pitch=clampP(drag.orig[k]+dy)});
+  // optional: dragged notes land only on notes of the key (the key is fixed when the drag starts)
+  if(drag.key===undefined)drag.key=PREFS.scaleSnap?D.key:null;
+  S.events.forEach((x,k)=>{if(S.sel.has(x.id)&&x.kind==='note'){let np=drag.orig[k]+dy;if(drag.key&&!inKey(np,drag.key))np+=dy>=0?1:-1;x.pitch=clampP(np)}});
   tone(S.events[drag.i].pitch,.15);renderAll({skipInsp:true})}
  else if(drag.mode==='resize'){const r=content.getBoundingClientRect();const want=(e.clientX-r.left)/S.ppb-D.starts[drag.i];
   let best=0,bd=1e9;NV.forEach((n,k)=>{const d=Math.abs(n.b-want);if(d<bd){bd=d;best=k}});
@@ -1355,7 +1400,7 @@ function rollMenu(at){const c=countOf(S.sel),p=curPhrase(),sm=segMarkItems();ret
 
 function phraseMenu(key){const p=D.byKey[key],prev=D.phrases[p.n-2],next=D.phrases[p.n];return[
  [`渲染 P${p.n}`,'',()=>{S.curPhrase=key;enqueue(key)},!renderable(p)],[`试听 P${p.n}`,'',()=>play(key)],0,
- [prev?`与上一句 P${prev.n} 合并`:'与上一句合并','',()=>mergeNext(prev),!prev],[next?`与下一句 P${next.n} 合并`:'与下一句合并','',()=>mergeNext(p),!next],0,
+ [prev?`与上一句 P${prev.n} 合并（合并后 ${((p.end-prev.start)*60/S.bpm).toFixed(1)} 秒）`:'与上一句合并','',()=>mergeNext(prev),!prev],[next?`与下一句 P${next.n} 合并（合并后 ${((next.end-p.start)*60/S.bpm).toFixed(1)} 秒）`:'与下一句合并','',()=>mergeNext(p),!next],0,
  [`选中整句 P${p.n}`,'',()=>selectPhrase(key,false)],[`删除整句 P${p.n}`,'',()=>deletePhrase(key)]]}
 function transpose(d){commit(()=>S.events.forEach(e=>{if(S.sel.has(e.id)&&e.kind==='note')e.pitch=clampP(e.pitch+d)}));const i=selIdx().find(i=>S.events[i].kind==='note');if(i!=null)tone(S.events[i].pitch,.2)}
 function setDur(k){commit(()=>S.events.forEach(e=>{if(S.sel.has(e.id))e.dur=k}))}
@@ -1446,12 +1491,13 @@ function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
   const take=forceTake||(opt.exp||p.status==='done'||p.status==='stale'?activeTake(p.key):null);
   const useVoice=take&&(forceTake||opt.exp||p.status==='done');
   if(opt.exp&&!useVoice)return;
-  if(useVoice&&take.buffer){const lead=take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);sink.push(s)}return}
+  if(useVoice&&take.buffer){const al=PREFS.alignAudio&&take.f0,buf=al?alignedBuffer(take,p):take.buffer,lead=!al&&take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<buf.duration){const s=c.createBufferSource();s.buffer=buf;s.connect(vg);s.start(st,off);sink.push(s)}return}
   const v=voiceObj();
   if(useVoice){const perf=takePerf(take,p);const ps=p.start*spb,fsec=fromBeat*spb,vopts={vibRate:5.5,vibDepth:0,fs:v.fs||1,vol:1};
-   perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+n.s,off=Math.max(0,fsec-a),dur=n.e-n.s-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
+   const A=PREFS.alignAudio;
+   perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+(A?n.sb*spb:n.s),full=A?n.b*spb:n.e-n.s,off=Math.max(0,fsec-a),dur=full-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
     if(!n.k){later(st,()=>sink.push(...breathNode(c,vg,st,dur,1)));return}
-    const k0=Math.round((n.s+off)/perf.hop),k1=Math.max(k0+2,Math.round(n.e/perf.hop));const cur=new Float32Array(k1-k0);
+    const k0=Math.round((n.s+off/full*(n.e-n.s))/perf.hop),k1=Math.max(k0+2,Math.round(n.e/perf.hop));const cur=new Float32Array(k1-k0);
     for(let k=k0;k<k1;k++){const m=perf.vals[k];cur[k-k0]=hz(m==null||isNaN(m)?n.p:m)}
     later(st,()=>sink.push(...vocalNote(c,vg,st,dur,hz(n.p),0,{...vopts,curve:cur,vowel:(n.w||'a').charCodeAt(0)%5,consonant:n.k!==2&&off===0})))});
   }else{
@@ -1482,7 +1528,7 @@ function togglePlay(){if(audio.playing){pause();if(PREFS.returnOnStop&&audio.sta
 function stopNodes(){clearInterval(audio.timer);audio.jobs=[];audio.ji=0;audio.nodes.forEach(n=>{try{n.stop?n.stop():0}catch(e){}try{n.disconnect()}catch(e){}});audio.nodes=[];cancelAnimationFrame(audio.raf)}
 function pause(){stopNodes();audio.playing=false;renderTopbar();renderRuler()}
 function stop(){pause();setPlayhead(0);roll.scrollLeft=0}
-function seek(b){const was=audio.playing;if(was)pause();setPlayhead(Math.max(0,b));if(was)play()}
+function seek(b){const was=audio.playing;if(was)pause();setPlayhead(Math.max(0,b));if(was)play();if(queue.length>1)sortQueue()}
 function setPlayhead(b,follow){S.playhead=b;const x=b*S.ppb+'px';['phGrid','phRuler','phLanes'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.left=x});
  $('#tcBar').textContent=posStr(b);$('#tcTime').textContent=fmtTime(b*60/S.bpm);
  if(follow&&PREFS.follow&&!scrub){const px=b*S.ppb;if(px>roll.scrollLeft+roll.clientWidth-60||px<roll.scrollLeft)roll.scrollLeft=px-60}}
@@ -1581,47 +1627,135 @@ function transposeDlg(){
    const from=key?keyName(key):'',to=key?keyName({...key,r:((key.r+d)%12+12)%12}):'';
    let span=null;if(set_){span=[Math.min(...ix.map(i=>D.starts[i])),Math.max(...ix.map(i=>D.starts[i]+beats(S.events[i])))]}
    closeDialog();
-   commit(()=>{S.events.forEach(e=>{if(e.kind==='note'&&(!set_||set_.has(e.id)))e.pitch=clampP(e.pitch+d)});
+   commit(()=>{S.events.forEach(e=>{if(e.kind==='note'&&(!set_||set_.has(e.id)))e.pitch=clampP(e.pitch+d)});if(!set_&&S.key)S.key={...S.key,r:((S.key.r+d)%12+12)%12};
     if(S.refF0&&st.ref)S.refShift=[...(S.refShift||[]),span?{b0:span[0],b1:span[1],d}:{b0:-1e9,b1:1e9,d}]});
    const n=ix.length,stale=D.phrases.filter(p=>p.status==='stale').length;
    toast(`已${set_?`把选中的 ${n} 个音`:'整首'}${d>0?'升高':'降低'} ${Math.abs(d)} 个半音${from&&!set_?`（${from} → ${to}）`:''}${stale?`，${stale} 个已渲染乐句需要重新渲染`:''}，Ctrl+Z 可撤销`)};
  })}
 
+// ---- takes: switch the take of the phrase being heard (or the current one) and keep playing ----
+function targetPhrase(){return audio.playing?D.phrases.find(p=>S.playhead>=p.start&&S.playhead<p.end+.01)||curPhrase():curPhrase()}
+function cycleTake(dir){const p=targetPhrase();if(!p)return;const r=S.renders[p.key];
+ if(!r||r.takes.length<2)return toast(r&&r.takes.length?`P${p.n} 只有一个版本，按“生成新版本”多生成几个再对比`:`P${p.n} 还没有渲染`);
+ const ts=r.takes,i=ts.findIndex(t=>t.id===r.active),nx=ts[((i<0?0:i)+dir+ts.length)%ts.length];r.active=nx.id;
+ const was=audio.playing,sb=audio.startBeat;renderAll();
+ if(was){const b=S.playhead;pause();setPlayhead(b);play();audio.startBeat=sb;renderRuler()}
+ toast(`P${p.n} · 版本 ${nx.n}（${ts.indexOf(nx)+1}/${ts.length}）${nx.fav?' ★':''}${nx.hash!==p.hash?' · 基于旧乐谱':''}`)}
+function toggleFav(){const p=targetPhrase(),t=p&&activeTake(p.key);if(!t)return toast('这一句还没有渲染');t.fav=!t.fav;renderAll();toast(t.fav?`已收藏 P${p.n} 的版本 ${t.n} ★`:`取消收藏 P${p.n} 的版本 ${t.n}`)}
+// ---- phrasing at the playhead ----
+function eventNearPlayhead(){const ph=S.playhead;let best=-1,bd=1e9;S.events.forEach((e,i)=>{const d=Math.abs(D.starts[i]-ph);if(d<bd){bd=d;best=i}});return best}
+function splitAtPlayhead(){const i=eventNearPlayhead();if(i<0)return;const e=S.events[i],ph=D.pOf[i];
+ if(e.kind==='rest'){if(!ph)return toast('这里已经在两句之间');breakAtRest(i);return}
+ if(!ph||ph.idx[0]===i)return toast('这里已经是句首');splitAt(i)}
+function mergeAtPlayhead(){const ph=S.playhead;let best=null,bd=1e9;
+ for(let k=0;k<D.phrases.length-1;k++){const a=D.phrases[k],b=D.phrases[k+1],d=ph<a.end?a.end-ph:ph>b.start?ph-b.start:0;if(d<bd){bd=d;best=a}}
+ if(!best)return toast('只有一句，没有可以合并的');mergeNext(best)}
+// ---- export the score ----
+function vlqBytes(n){const b=[n&0x7f];n=Math.floor(n/128);while(n>0){b.unshift((n&0x7f)|0x80);n=Math.floor(n/128)}return b}
+function smfTrack(evs){evs.sort((a,b)=>a[0]-b[0]||a[2]-b[2]);const out=[];let t=0;evs.forEach(([tk,bytes])=>{out.push(...vlqBytes(tk-t),...bytes);t=tk});out.push(0,0xff,0x2f,0);
+ return[0x4d,0x54,0x72,0x6b,(out.length>>>24)&255,(out.length>>>16)&255,(out.length>>>8)&255,out.length&255,...out]}
+const metaEv=(t,type,data,ord=0)=>[t,[0xff,type,...vlqBytes(data.length),...data],ord];
+// Format 1: a conductor track (name, tempo, time signature) and the vocal with one lyric event per note ("-" for a melisma)
+function scoreMidi(){const DIV=480,enc=new TextEncoder(),us=Math.round(6e7/S.bpm),txt=x=>[...enc.encode(x)];
+ const cond=[metaEv(0,3,txt(S.name||'VocalRender')),metaEv(0,0x51,[(us>>16)&255,(us>>8)&255,us&255]),metaEv(0,0x58,[S.bpb,2,24,8])];
+ const voc=[metaEv(0,3,txt('Vocal · '+voiceObj().name))];
+ S.events.forEach((e,i)=>{if(e.kind!=='note')return;const t0=Math.round(D.starts[i]*DIV),t1=Math.round((D.starts[i]+beats(e))*DIV);
+  voc.push(metaEv(t0,5,txt(e.word==='-'?'-':e.word),1),[t0,[0x90,e.pitch,96],2],[t1,[0x80,e.pitch,0],0])});
+ return new Uint8Array([0x4d,0x54,0x68,0x64,0,0,0,6,0,1,0,2,(DIV>>8)&255,DIV&255,...smfTrack(cond),...smfTrack(voc)])}
+// One VocalRender label entry per phrase, exactly what each render request carries as "score"
+function scoreLabels(){return D.phrases.filter(p=>p.idx.some(i=>S.events[i].kind==='note')).map(p=>({...p.req}))}
+async function exportScore(kind){if(!S.events.some(e=>e.kind==='note'))return toast('还没有音符可以导出');
+ const base=(fileRef?fileRef.name.replace(/\.vrproj$/i,''):S.name)||'score';
+ try{
+  if(kind==='mid'){if(!DESK)return toast('网页版不能保存文件，请在桌面版导出 MIDI','err');const r=await DESK.saveFile({kind:'mid',data:scoreMidi(),defaultName:base+'.mid'});if(r)toast(`已导出 ${r.name}`);return}
+  const list=scoreLabels(),txt=JSON.stringify(list,null,1);
+  if(DESK){const r=await DESK.saveFile({kind:'json',data:txt,defaultName:base+'.json'});if(r)toast(`已导出 ${r.name}（${list.length} 句）`);return}
+  dialog('导出 VocalRender JSON',`<p class="hint" style="margin:0 0 8px">每个乐句一条（共 ${list.length} 条），格式与 VocalRender 标注 JSON 相同：word / pitch / note / pitch2word / bpm。网页版不能直接保存文件，请复制后粘贴到文件里。</p><textarea id="expJson" readonly spellcheck="false" style="min-height:220px">${esc(txt)}</textarea>`,
+   `<button class="btn line" data-close>关闭</button><button class="btn primary" id="expCopy">复制</button>`,o=>{o.querySelector('#expCopy').onclick=()=>{const ta=o.querySelector('#expJson'),sel=()=>{ta.focus();ta.select();toast('已选中，按 Ctrl+C 复制')};
+    if(navigator.clipboard)navigator.clipboard.writeText(txt).then(()=>toast('已复制'),sel);else sel()}})}
+ catch(e){toast('导出失败：'+e.message,'err')}}
+
+/* ================= align rendered vocals to the score ================= */
+// WSOLA time-stretch (keeps pitch) along a piecewise-linear map [outSec, inSec]
+function wsola(inp,sr,map,outLen){
+ const N=Math.round(sr*.04)&~1,H=N/2,tol=Math.round(sr*.008),win=new Float32Array(N);for(let i=0;i<N;i++)win[i]=.5-.5*Math.cos(2*Math.PI*i/N);
+ const out=new Float32Array(outLen+N),norm=new Float32Array(outLen+N);let mi=0,prev=-1;
+ const inAt=t=>{while(mi<map.length-2&&map[mi+1][0]<=t)mi++;const[a0,b0]=map[mi],[a1,b1]=map[Math.min(mi+1,map.length-1)];return a1>a0?b0+(Math.min(t,a1)-a0)/(a1-a0)*(b1-b0):b0};
+ for(let o=0;o<outLen;o+=H){let ip=Math.round(inAt(o/sr)*sr);
+  if(prev>=0){const nat=prev+H;if(nat+N<=inp.length){let best=ip,bc=-Infinity;   // pick the offset that continues the previous frame most smoothly
+    for(let d=-tol;d<=tol;d+=2){const c0=ip+d;if(c0<0||c0+N>inp.length)continue;let c=0;for(let k=0;k<N;k+=4)c+=inp[c0+k]*inp[nat+k];if(c>bc){bc=c;best=c0}}ip=best}}
+  ip=Math.max(0,Math.min(inp.length-N,ip));
+  for(let k=0;k<N;k++){out[o+k]+=inp[ip+k]*win[k];norm[o+k]+=win[k]}prev=ip}
+ for(let i=0;i<outLen;i++)if(norm[i]>1e-3)out[i]/=norm[i];
+ return out.subarray(0,outLen)}
+// A take's audio re-timed so each note (from the pitch alignment) starts and ends where the score says; cached on the take
+function alignedBuffer(take,p){const perf=takePerf(take,p),b=take.buffer,ns=perf.notes;if(!b||!ns.length)return b;
+ const key=ns.map(n=>n.s.toFixed(3)).join(',');if(take._al&&take._al.key===key)return take._al.buf;
+ const spb=60/perf.bpm,sr=b.sampleRate,map=[];let lo=-1;
+ ns.forEach(n=>{const o=n.sb*spb;if(o>lo+1e-4){map.push([o,Math.max(0,n.s)]);lo=o}});
+ const last=ns[ns.length-1],oe=(last.sb+last.b)*spb;if(oe>lo+1e-4)map.push([oe,Math.min(b.duration,last.e)]);
+ const tail=Math.max(0,Math.min(1,b.duration-last.e));map.push([oe+tail+1e-3,Math.min(b.duration,last.e+tail)]);
+ let mono=b.getChannelData(0);if(b.numberOfChannels>1){const m=new Float32Array(b.length),r=b.getChannelData(1);for(let i=0;i<m.length;i++)m[i]=(mono[i]+r[i])/2;mono=m}
+ const outLen=Math.ceil(map[map.length-1][0]*sr),out=wsola(mono,sr,map,outLen),buf=new AudioBuffer({length:Math.max(1,outLen),sampleRate:sr,numberOfChannels:1});
+ buf.copyToChannel(out,0);take._al={key,buf};return buf}
+
 /* ================= render service ================= */
-const queue=[];let working=null;
+const queue=[],working=new Set();
 function renderable(p){return p.status!=='error'&&p.status!=='queued'&&p.status!=='rendering'&&p.idx.some(i=>S.events[i].kind==='note')}
+// phrases at or after the playhead first, then the ones before it
+const prio=p=>p.end>S.playhead?p.start:1e6+p.start;
+function sortQueue(){queue.sort((a,b)=>prio(D.byKey[a]||{start:1e9,end:1e9})-prio(D.byKey[b]||{start:1e9,end:1e9}))}
+// a phrase whose current score/settings match an earlier take just switches back to it
+function reuseTakes(list){let n=0;list.forEach(p=>{const r=S.renders[p.key];const t=r&&[...r.takes].reverse().find(x=>x.hash===p.hash);if(t){r.active=t.id;n++}});return n}
+function pendingPhrases(){return D.phrases.filter(p=>(p.status==='none'||p.status==='stale')&&renderable(p))}
 function renderPending(){
  const busy=Object.values(S.renders).filter(r=>r.job).length;if(busy){cancelAll();return}
  const gl=D.issues.find(x=>x.global&&x.lv==='err');if(gl)return toast(gl.msg,'err');
- const list=D.phrases.filter(p=>(p.status==='none'||p.status==='stale')&&renderable(p));
- const errs=D.phrases.filter(p=>p.status==='error').length;
- if(!list.length)return toast(errs?`${errs} 个乐句有错误，修正后才能渲染`:'所有乐句都是最新的');
- list.forEach(p=>enqueue(p.key));if(errs)toast(`已跳过 ${errs} 个有错误的乐句`);
+ let list=pendingPhrases();const errs=D.phrases.filter(p=>p.status==='error').length;
+ const reused=reuseTakes(list);if(reused){renderAll();list=pendingPhrases()}
+ if(!list.length)return toast(reused?`${reused} 句直接用回了之前的版本，没有需要渲染的了`:errs?`${errs} 个乐句有错误，修正后才能渲染`:'所有乐句都是最新的');
+ list.sort((a,b)=>prio(a)-prio(b)).forEach(p=>enqueue(p.key,true));renderAll();pump();
+ toast([reused?`${reused} 句用回了之前的版本`:'',errs?`已跳过 ${errs} 个有错误的乐句`:''].filter(Boolean).join('，')||`开始渲染 ${list.length} 句，从播放头附近开始`);
 }
-function enqueue(key){const p=D.byKey[key];if(!p||!renderable(p))return;
+function enqueue(key,quiet){const p=D.byKey[key];if(!p||!renderable(p))return;
  const gl=D.issues.find(x=>x.global&&x.lv==='err');if(gl)return toast(gl.msg,'err');
- const r=rec(key);r.job={state:'queued',progress:0,hash:p.hash,request:renderRequest(p),snap:snapshotOf(p),voiceId:S.voice,abort:null};queue.push(key);renderAll();pump()}
-async function pump(){
- if(working||!queue.length)return;const key=queue.shift();const r=S.renders[key];if(!r||!r.job){pump();return}
- working=key;r.job.state='rendering';renderAll();
+ const r=rec(key);r.job={state:'queued',progress:0,hash:p.hash,request:renderRequest(p),snap:snapshotOf(p),voiceId:S.voice,sec:(p.end-p.start)*60/S.bpm,abort:null};queue.push(key);if(!quiet){renderAll();pump()}}
+function pump(){const conc=Math.max(1,Math.min(4,+S.service.conc||1));
+ while(working.size<conc&&queue.length){const key=queue.shift(),r=S.renders[key];if(r&&r.job&&r.job.state==='queued')runJob(key,r)}}
+async function runJob(key,r){
+ working.add(key);r.job.state='rendering';const t0=performance.now();renderAll();
  try{
   const res=await Client.render(r.job.request,pr=>{if(!r.job)return;r.job.progress=pr;liveProgress(key)},r.job);
   if(!r.job)throw new Error('cancelled');
   const seed=r.job.request.generation.seed??res.seed;
-  const t={id:'t'+Date.now().toString(36),n:(r.takes.reduce((m,x)=>Math.max(m,x.n),0))+1,seed,hash:r.job.hash,params:r.job.request.generation,ckpt:r.job.request.checkpoint,voice:(allVoices().find(v=>v.id===r.job.voiceId)||voiceObj()).name,at:Date.now(),buffer:res.buffer||null,snap:r.job.snap,f0:res.f0||null};
+  const t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),n:(r.takes.reduce((m,x)=>Math.max(m,x.n),0))+1,seed,hash:r.job.hash,params:r.job.request.generation,ckpt:r.job.request.checkpoint,voice:(allVoices().find(v=>v.id===r.job.voiceId)||voiceObj()).name,at:Date.now(),buffer:res.buffer||null,snap:r.job.snap,f0:res.f0||null};
+  noteRate((performance.now()-t0)/1000,r.job.sec);
   r.takes.push(t);r.active=t.id;r.job=null;
+  if(t.buffer&&t.f0&&PREFS.alignAudio)setTimeout(()=>{const p=D.byKey[key];if(p)try{alignedBuffer(t,p)}catch(e){}},30);   // prepare aligned audio ahead of playback
  }catch(err){if(r.job){r.job=null;if(err.message!=='cancelled')toast('渲染失败：'+err.message,'err')}}
- working=null;renderAll();
- if(!queue.length&&!Object.values(S.renders).some(x=>x.job))toast('渲染完成');
+ working.delete(key);renderAll();
+ if(!queue.length&&!working.size&&!Object.values(S.renders).some(x=>x.job)&&!autoRun)toast('渲染完成');
  pump();
 }
+// rendering speed (seconds of work per second of audio), remembered per service to estimate waiting time
+function rateKey(){return 'vrstudio.rate.'+(S.service.mode==='demo'?'demo':S.service.base)}
+function noteRate(work,sec){if(!(sec>0))return;const k=rateKey(),old=store.get(k),v=work/sec;store.set(k,old?old*.7+v*.3:v)}
+function estimate(sec){const r=store.get(rateKey());if(!r||!sec)return '';const t=sec*r/Math.max(1,Math.min(4,+S.service.conc||1));return t<60?`约 ${Math.max(1,Math.round(t))} 秒`:`约 ${Math.round(t/60)} 分钟`}
+// optional: render what changed after editing pauses for a few seconds
+let autoT=0,autoRun=false;
+function scheduleAuto(){if(!PREFS.autoRender)return;clearTimeout(autoT);autoT=setTimeout(autoRenderNow,3000)}
+function autoRenderNow(){if(!PREFS.autoRender)return;if(drag||lyrEdit||!$('#overlay').hidden){scheduleAuto();return}
+ if(D.issues.some(x=>x.global&&x.lv==='err'))return;
+ let list=pendingPhrases();if(!list.length)return;if(reuseTakes(list)){renderAll();list=pendingPhrases()}
+ if(!list.length)return;autoRun=true;list.sort((a,b)=>prio(a)-prio(b)).forEach(p=>enqueue(p.key,true));renderAll();pump();
+ const done=()=>{if(working.size||queue.length)return setTimeout(done,500);autoRun=false};done()}
 function liveProgress(key){
  const p=D.byKey[key];if(!p)return;const r=S.renders[key];const pr=r.job?r.job.progress:0;
  const band=$(`.pband[data-key="${key}"]`);if(band){let f=band.querySelector('.pf');if(!f){f=document.createElement('span');f.className='pf';band.appendChild(f)}f.style.transform=`scaleX(${pr})`}
  const seg=$(`.lseg[data-key="${key}"]`);if(seg){seg.innerHTML=`<span class="prog" style="width:${pr*100}%"></span><span class="lbl">渲染中 ${Math.round(pr*100)}%</span>`}
  renderTopbar();
 }
-function cancelAll(){queue.length=0;Object.values(S.renders).forEach(r=>{if(r.job){r.job.abort&&r.job.abort();r.job=null}});renderAll();toast('已取消渲染')}
+function cancelAll(){queue.length=0;autoRun=false;clearTimeout(autoT);Object.values(S.renders).forEach(r=>{if(r.job){r.job.abort&&r.job.abort();r.job=null}});renderAll();toast('已取消渲染')}
 function cancelOne(key){const r=S.renders[key];if(!r||!r.job)return;const qi=queue.indexOf(key);if(qi>=0)queue.splice(qi,1);r.job.abort&&r.job.abort();r.job=null;renderAll()}
 
 const Client={
@@ -1689,9 +1823,9 @@ $('#overlay').addEventListener('click',e=>{if(e.target.closest('[data-close]')||
 const MENUS={
  file:[['新建空白工程',DESK?'Ctrl+N':'',()=>newProject()],['打开工程文件…','Ctrl+O',()=>openProject()],...(DESK?[['保存','Ctrl+S',()=>saveProject(false)],['另存为…','Ctrl+Shift+S',()=>saveProject(true)]]:[]),0,
   ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};S.refF0=null;renderAll();toast('已载入示例')}],0,
-  ['导入乐谱（MIDI / JSON）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
+  ['导入乐谱（MIDI / JSON）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],['导出乐谱（MIDI）…','',()=>exportScore('mid')],['导出乐谱（VocalRender JSON）…','',()=>exportScore('json')],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
  edit:()=>[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending],0,
-  ['移调…','K',()=>transposeDlg()],0,['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
+  ['移调…','K',()=>transposeDlg()],0,['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.alignAudio?'✓ ':'')+'人声对齐到乐谱节奏','',()=>{PREFS.alignAudio=!PREFS.alignAudio;savePrefs();renderInspector();toast(PREFS.alignAudio?'播放和导出时人声对齐到乐谱节奏':'播放和导出使用模型原始节奏')}],[(PREFS.autoRender?'✓ ':'')+'改动后自动渲染','',()=>{PREFS.autoRender=!PREFS.autoRender;savePrefs();renderInspector();renderStatus();if(PREFS.autoRender){toast('停止编辑约 3 秒后自动渲染改动的乐句');scheduleAuto()}else toast('已关闭自动渲染')}],0,[(PREFS.scaleHL?'✓ ':'')+'高亮调内音','',()=>{PREFS.scaleHL=!PREFS.scaleHL;savePrefs();renderAll()}],[(PREFS.scaleSnap?'✓ ':'')+'拖动时吸附调内音','',()=>{PREFS.scaleSnap=!PREFS.scaleSnap;savePrefs();renderAll()}],[(PREFS.segLines?'✓ ':'')+'显示乐句边界线','',()=>{PREFS.segLines=!PREFS.segLines;savePrefs();renderRoll()}],0,[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
  help:[['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
 let openMenu=null;
 // items: [label, shortcut, action, disabled] or 0 for a separator
@@ -1707,7 +1841,7 @@ document.addEventListener('click',e=>{const mb=e.target.closest('[data-menu]');
  if(mb){const r=mb.getBoundingClientRect(),m=MENUS[mb.dataset.menu];popMenu(typeof m==='function'?m():m,r.left,r.bottom+4)}
 });
 function confirmDlg(t,msg,ok,fn){dialog(t,`<p style="margin:0;line-height:1.6">${esc(msg)}</p>`,`<button class="btn line" data-close>取消</button><button class="btn primary" id="cfOk">${esc(ok)}</button>`,o=>o.querySelector('#cfOk').onclick=()=>{closeDialog();fn()})}
-function kbDlg(){const K=[['播放 / 停止','Space'],['从选中音符开始播放','Shift+Space'],['停止并回到开头','Esc'],['回到开头 / 结尾','Home / End'],['移动播放头','单击或拖动标尺；单击卷帘空白处'],['从某处开始播放','双击标尺'],['跳到指定位置','单击时间码 / Ctrl+G'],['播放头前后一拍 / 一小节',', . / Shift + , .'],['上一句 / 下一句开头','Ctrl+← / Ctrl+→'],['播放头移到选中音符','L'],['移调（整首或选中部分）','K'],['定位时不吸附','按住 Alt'],['选择 / 铅笔 / 橡皮','V / B / E'],['选中前一个 / 后一个','← / →'],['音高 ±1 半音','↑ / ↓'],['音高 ±1 八度','Shift + ↑ / ↓'],['缩短 / 延长时值','[ / ]'],['编辑歌词（Tab 跳到下一个）','Enter / 双击'],['插入音符 / 休止 / 连音','N / R / M'],['删除选中','Delete / Backspace'],['删除并保留空位（改为休止）','Shift+Delete'],['框选多个（Shift/Ctrl 追加）','在空白处拖动'],['连续删除','橡皮工具拖过音符'],['删除整句、更多操作','右键音符或乐句条'],['撤销 / 重做','Ctrl+Z / Ctrl+Shift+Z'],['全选','Ctrl+A'],['渲染未渲染乐句','Ctrl+R'],['横向缩放 / 纵向缩放','Ctrl+滚轮 / Alt+滚轮']];
+function kbDlg(){const K=[['播放 / 停止','Space'],['从选中音符开始播放','Shift+Space'],['停止并回到开头','Esc'],['回到开头 / 结尾','Home / End'],['移动播放头','单击或拖动标尺；单击卷帘空白处'],['从某处开始播放','双击标尺'],['跳到指定位置','单击时间码 / Ctrl+G'],['播放头前后一拍 / 一小节',', . / Shift + , .'],['上一句 / 下一句开头','Ctrl+← / Ctrl+→'],['播放头移到选中音符','L'],['移调（整首或选中部分）','K'],['在播放头处断句 / 合并','S / Shift+S'],['切换当前乐句的版本（播放时也可以）','T / Shift+T'],['收藏当前版本','F'],['定位时不吸附','按住 Alt'],['选择 / 铅笔 / 橡皮','V / B / E'],['选中前一个 / 后一个','← / →'],['音高 ±1 半音','↑ / ↓'],['音高 ±1 八度','Shift + ↑ / ↓'],['缩短 / 延长时值','[ / ]'],['编辑歌词（Tab 跳到下一个）','Enter / 双击'],['插入音符 / 休止 / 连音','N / R / M'],['删除选中','Delete / Backspace'],['删除并保留空位（改为休止）','Shift+Delete'],['框选多个（Shift/Ctrl 追加）','在空白处拖动'],['连续删除','橡皮工具拖过音符'],['删除整句、更多操作','右键音符或乐句条'],['撤销 / 重做','Ctrl+Z / Ctrl+Shift+Z'],['全选','Ctrl+A'],['渲染未渲染乐句','Ctrl+R'],['横向缩放 / 纵向缩放','Ctrl+滚轮 / Alt+滚轮']];
  dialog('快捷键',`<div class="kb-grid">${K.map(([a,b])=>`<span>${a}</span><kbd>${b}</kbd>`).join('')}</div>`)}
 function aboutDlg(){dialog('关于 VocalRender',`<div style="line-height:1.75;font-size:13px">${DESK?`<p style="margin-top:0"><b>VocalRender Studio 桌面版 v${esc(DESK.info.version||'')}</b></p>`:''}
  <p style="margin-top:0">VocalRender 是乐谱原生（score-native）的歌声合成模型：直接读取歌词、MIDI 音高、音符时值和全局速度，生成 48 kHz 歌声，不需要逐音素时长或对齐好的参考音频。</p>
@@ -1717,11 +1851,12 @@ function aboutDlg(){dialog('关于 VocalRender',`<div style="line-height:1.75;fo
 function settingsDlg(){const s=S.service;
  dialog('服务设置',`<div class="fld"><div class="lab">渲染服务</div><div class="segs"><button data-sm="demo" class="${s.mode==='demo'?'on':''}">演示（模拟渲染）</button><button data-sm="remote" class="${s.mode==='remote'?'on':''}">连接 VocalRender 服务</button></div></div>
  <div class="fld"><label for="sBase">服务地址</label><input class="inp mono" id="sBase" value="${esc(s.base)}" placeholder="https://your-gpu-server/v1"></div>
+ <div class="fld"><label for="sConc">同时渲染</label><select class="inp" id="sConc" style="width:auto">${[1,2,3,4].map(n=>`<option value="${n}" ${+s.conc===n?'selected':''}>${n} 句</option>`).join('')}</select><p class="hint">服务端有多张显卡或支持批处理时可以调大；只有一张显卡时保持 1。</p></div>
  <div class="fld"><label for="sKey">访问 Token（可选）</label><input class="inp mono" id="sKey" type="password" value="${esc(s.key)}" autocomplete="off"><p class="hint">只保存在当前页面内存中，刷新后需重新填写。</p></div>
  <div class="card hint">远程模式按“接口”面板里的端点调用：POST /render 提交、GET /jobs/{id} 轮询、取回 48 kHz WAV。服务端可基于官方 <span class="mono">demo/app.py</span> 封装。<br>${DESK?'桌面版由系统网络直接连接服务，不受浏览器跨域限制。':'网页版直接从浏览器请求，服务端需要允许跨域（CORS）。'}</div>`,
  `<button class="btn line" id="sTest">测试连接</button><button class="btn primary" id="sSave">保存</button>`,o=>{
   let mode=s.mode;o.querySelectorAll('[data-sm]').forEach(b=>b.onclick=()=>{mode=b.dataset.sm;o.querySelectorAll('[data-sm]').forEach(x=>x.classList.toggle('on',x===b))});
-  const apply=()=>{s.mode=mode;s.base=o.querySelector('#sBase').value.trim();s.key=o.querySelector('#sKey').value};
+  const apply=()=>{s.mode=mode;s.base=o.querySelector('#sBase').value.trim();s.key=o.querySelector('#sKey').value;s.conc=+o.querySelector('#sConc').value||1};
   o.querySelector('#sTest').onclick=async()=>{const old={...s};apply();try{toast(await Client.health())}catch(e){toast('连接失败：'+e.message,'err')}Object.assign(s,old)};
   o.querySelector('#sSave').onclick=()=>{apply();closeDialog();renderAll();toast(s.mode==='demo'?'已切换到演示服务':'已切换到远程服务')}})}
 // ---- Timed transcriptions: text / note_pitch / note_type / duration (seconds), optional time [ms] and f0 ----
@@ -2040,7 +2175,7 @@ function http(url,init={}){
 }
 function projectData(){const renders={};Object.entries(S.renders).forEach(([k,r])=>{if(r.takes.length)renders[k]={takes:r.takes.map(t=>({...t,buffer:undefined})),active:r.active,job:null}});
  const customVoices=S.customVoices.filter(v=>v._b64||v.buffer).map(v=>({id:v.id,name:v.name,dur:+(+v.dur).toFixed(3),sr:v.sr,ch:v.ch,consent:!!v.consent,wav:voiceB64(v)}));
- return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,customVoices,refF0:S.refF0||null,refShift:S.refShift||[],renders}}
+ return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,customVoices,refF0:S.refF0||null,refShift:S.refShift||[],phraseGen:S.phraseGen||{},key:S.key||null,renders}}
 const projectJSON=()=>JSON.stringify(projectData());
 const isDirty=()=>!!fileRef&&savedJSON!==projectJSON();
 function updateTitle(){if(!DESK)return;document.title=(isDirty()?'● ':'')+(fileRef?fileRef.name.replace(/\.vrproj$/i,''):S.name)+' - VocalRender Studio'}
@@ -2049,7 +2184,7 @@ function loadProject(o,ref){
  if(audio.playing)pause();queue.length=0;
  if(Array.isArray(o.customVoices))restoreVoices(o.customVoices);
  Object.assign(S,{name:o.name||'未命名工程',bpm:+o.bpm||90,bpb:+o.bpb||4,events:o.events.map(e=>({...e,id:e.id||uid()})),voice:[...VOICES,...S.customVoices].some(v=>v.id===o.voice)?o.voice:'Alto-1',ckpt:o.ckpt||'VocalRender-Pro',renders:o.renders||{}});
- Object.values(S.renders).forEach(r=>r.job=null);if(o.gen)Object.assign(S.gen,o.gen);S.refF0=o.refF0||null;S.refShift=o.refShift||[];
+ Object.values(S.renders).forEach(r=>r.job=null);if(o.gen)Object.assign(S.gen,o.gen);S.refF0=o.refF0||null;S.refShift=o.refShift||[];S.phraseGen=o.phraseGen||{};S.key=o.key||null;
  S.sel.clear();S.curPhrase=null;S.playhead=0;hist=[];redo=[];perfCache.clear();
  $('#bpm').value=S.bpm;$('#bpb').value=S.bpb;$('#ckpt').value=S.ckpt;$('#projName').value=S.name;
  fileRef=ref||null;renderVoices();renderAll();savedJSON=fileRef?projectJSON():null;updateTitle();
@@ -2189,17 +2324,27 @@ $('#inspBody').addEventListener('click',e=>{
  else if(d.act==='copyapi')copyApi();
  else if(d.pick){const p=curPhrase();S.renders[p.key].active=d.pick;renderAll()}
  else if(d.playtake){const p=curPhrase();const tk=S.renders[p.key].takes.find(x=>x.id===d.playtake);play(p.key,tk)}
+ else if(d.pgseed){const p=curPhrase(),o=p&&S.phraseGen[p.key];if(o){o.seedMode=d.pgseed;renderAll()}}
+ else if(d.fav){const p=curPhrase(),t=p&&S.renders[p.key].takes.find(x=>x.id===d.fav);if(t){t.fav=!t.fav;renderAll()}}
  else if(d.deltake){const p=curPhrase();const r=S.renders[p.key];r.takes=r.takes.filter(x=>x.id!==d.deltake);if(r.active===d.deltake)r.active=r.takes.length?r.takes[r.takes.length-1].id:null;renderAll()}
 });
 $('#inspBody').addEventListener('input',e=>{const t=e.target;
  if(t.dataset.g){const k=t.dataset.g;S.gen[k]=+t.value;S.gen.preset=k==='cfg'||k==='temp'?'custom':S.gen.preset;const lab=$('#v_'+k);if(lab)lab.textContent=(+t.value).toFixed(t.step<1?(t.step<.1?2:1):0);derive();renderRuler();renderLanes();renderStatus();renderTopbar();persist();
   $$('#inspBody [data-preset]').forEach(b=>b.classList.toggle('on',b.dataset.preset===S.gen.preset))}
  else if(t.id==='gSeed'){S.gen.seed=Math.floor(+t.value||0);persist()}
+ else if(t.dataset.pg){const p=curPhrase(),o=p&&S.phraseGen[p.key];if(!o)return;o[t.dataset.pg]=+t.value;const lab=$('#pv_'+t.dataset.pg);if(lab)lab.textContent=(+t.value).toFixed(t.step<1?(t.step<.1?2:1):0);derive();renderRuler();renderLanes();renderStatus();renderTopbar();persist()}
+ else if(t.id==='pgSeed'){const p=curPhrase(),o=p&&S.phraseGen[p.key];if(o){o.seed=Math.floor(+t.value||0);derive();renderRuler();persist()}}
 });
 $('#inspBody').addEventListener('change',e=>{const t=e.target;const one=selIdx();
  if(t.id==='pLyric'&&one.length===1){const toks=tokenize(t.value.trim());if(!toks.length)return;const i=one[0];commit(()=>{let j=i,k=0;while(j<S.events.length&&k<toks.length){if(S.events[j].kind==='note'){applyWord(S.events[j],toks[k]);k++}j++}})}
  else if(t.id==='pPitch'&&one.length===1){const v=clampP(Math.round(+t.value));commit(()=>S.events[one[0]].pitch=v);tone(v)}
  else if(t.id==='gLyricsOnly'){S.gen.lyricsOnly=t.checked;renderAll()}
+ else if(t.id==='keySel'){const v=t.value;commit(()=>{S.key=v==='auto'?null:{mode:v.slice(0,3),r:+v.slice(3)}});toast(v==='auto'?'调性改为自动推测':`调性设为 ${keyName(S.key)}`)}
+ else if(t.id==='scaleHL'){PREFS.scaleHL=t.checked;savePrefs();renderAll()}
+ else if(t.id==='scaleSnap'){PREFS.scaleSnap=t.checked;savePrefs();toast(t.checked?'拖动音符时只落在调内音上':'拖动音符按半音移动')}
+ else if(t.id==='pgOn'){const p=curPhrase();if(!p)return;if(t.checked){const g=S.gen;S.phraseGen[p.key]={cfg:g.cfg,temp:g.temp,steps:g.steps,seedMode:g.seedMode,seed:g.seed}}else delete S.phraseGen[p.key];renderAll()}
+ else if(t.id==='alignAudio'){PREFS.alignAudio=t.checked;savePrefs();toast(t.checked?'播放和导出时人声对齐到乐谱节奏':'播放和导出使用模型原始节奏')}
+ else if(t.id==='autoRender'){PREFS.autoRender=t.checked;savePrefs();renderStatus();if(t.checked){toast('停止编辑约 3 秒后自动渲染改动的乐句');scheduleAuto()}}
  else if(t.id==='segRest'){S.gen.segRest=+t.value;renderAll()}
  else if(t.id==='segMax'){S.gen.segMaxSec=+t.value;renderAll()}
 });
@@ -2232,6 +2377,9 @@ document.addEventListener('keydown',e=>{
   case ' ':e.preventDefault();if(e.shiftKey)playFromSelection();else togglePlay();break;
   case 'l':case 'L':locateSelection();break;
   case 'k':case 'K':e.preventDefault();transposeDlg();break;
+  case 's':case 'S':e.preventDefault();e.shiftKey?mergeAtPlayhead():splitAtPlayhead();break;
+  case 't':case 'T':e.preventDefault();cycleTake(e.shiftKey?-1:1);break;
+  case 'f':case 'F':e.preventDefault();toggleFav();break;
   case 'Escape':if(openMenu){openMenu.remove();openMenu=null}else if(audio.playing||S.playhead)stop();else{S.sel.clear();renderAll()}break;
   case 'Home':e.preventDefault();seek(0);roll.scrollLeft=0;break;
   case 'End':e.preventDefault();seek(D.total);break;

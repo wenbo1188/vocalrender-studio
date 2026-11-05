@@ -126,13 +126,19 @@ ipcMain.handle('vr:request', async (_e, req) => {
 });
 
 ipcMain.handle('vr:save', async (_e, o) => {
-  const isWav = o.kind === 'wav';
+  const KINDS = {
+    wav: { title: '导出音频', dir: 'music', filters: [{ name: 'WAV 音频', extensions: ['wav'] }] },
+    mid: { title: '导出 MIDI', dir: 'documents', filters: [{ name: 'MIDI', extensions: ['mid'] }] },
+    json: { title: '导出 VocalRender JSON', dir: 'documents', filters: [{ name: 'JSON', extensions: ['json'] }] },
+    project: { title: '保存工程', dir: 'documents', filters: [{ name: 'VocalRender 工程', extensions: ['vrproj'] }] },
+  };
+  const kind = KINDS[o.kind] || KINDS.project;
   let target = o.path || null;
   if (!target) {
     const r = await dialog.showSaveDialog(win, {
-      title: isWav ? '导出音频' : '保存工程',
-      defaultPath: path.join(app.getPath(isWav ? 'music' : 'documents'), safeName(o.defaultName)),
-      filters: isWav ? [{ name: 'WAV 音频', extensions: ['wav'] }] : [{ name: 'VocalRender 工程', extensions: ['vrproj'] }],
+      title: kind.title,
+      defaultPath: path.join(app.getPath(kind.dir), safeName(o.defaultName)),
+      filters: kind.filters,
     });
     if (r.canceled || !r.filePath) return null;
     target = r.filePath;
@@ -143,7 +149,7 @@ ipcMain.handle('vr:save', async (_e, o) => {
     : d instanceof ArrayBuffer ? Buffer.from(d)
     : Buffer.from(Object.values(d || {}));
   await fs.writeFile(target, buf);
-  if (!isWav) app.addRecentDocument(target);
+  if (o.kind === 'project' || !o.kind) app.addRecentDocument(target);
   return { path: target, name: path.basename(target) };
 });
 
