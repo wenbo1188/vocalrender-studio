@@ -1518,6 +1518,10 @@ function pianoNote(c,out,t,dur,m,vel){
  nodes[0].onended=()=>{try{g.disconnect()}catch(e){}};
  return nodes;
 }
+// Beat at which a take's voice ends when played at phrase p: the end of its audio (placed like scheduleRange does), or of its last note
+function takeEnd(t,p){const spb=60/S.bpm;
+ if(t.buffer){const lead=t.f0?((takePerf(t,p).notes[0]||{}).s||0):0;return p.start+(t.buffer.duration-lead)/spb}
+ const n=takePerf(t,p).notes;return n.length?p.start+n[n.length-1].e/spb:p.end}
 function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
  const c=opt.c||ctx(),master=opt.master||audio.master,sink=opt.sink||audio.nodes,spb=60/S.bpm,t0=opt.c?opt.t0:c.currentTime+.08;
  if(!opt.c){audio.t0=t0;audio.from=fromBeat;audio.jobs=[];audio.ji=0}
@@ -1529,9 +1533,11 @@ function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
   const take=forceTake||(opt.exp||p.status==='done'||p.status==='stale'?activeTake(p.key):null);
   const useVoice=take&&(forceTake||opt.exp||p.status==='done');
   if(opt.exp&&!useVoice)return;
-  if(useVoice&&take.buffer){const lead=take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);sink.push(s)}return}
+  // the model's audio usually runs past the written end of the phrase (lead-in, its own timing, the trailing rest):
+  // keep playing until the audio itself has ended, so the last words aren't cut off
+  if(useVoice&&take.buffer){const lead=take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;endBeat=Math.max(endBeat,takeEnd(take,p));let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);sink.push(s)}return}
   const v=voiceObj();
-  if(useVoice){const perf=takePerf(take,p);const ps=p.start*spb,fsec=fromBeat*spb,vopts={vibRate:5.5,vibDepth:0,fs:v.fs||1,vol:1};
+  if(useVoice){const perf=takePerf(take,p);endBeat=Math.max(endBeat,takeEnd(take,p));const ps=p.start*spb,fsec=fromBeat*spb,vopts={vibRate:5.5,vibDepth:0,fs:v.fs||1,vol:1};
    perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+n.s,off=Math.max(0,fsec-a),dur=n.e-n.s-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
     if(!n.k){later(st,()=>sink.push(...breathNode(c,vg,st,dur,1)));return}
     const k0=Math.round((n.s+off)/perf.hop),k1=Math.max(k0+2,Math.round(n.e/perf.hop));const cur=new Float32Array(k1-k0);
@@ -2335,6 +2341,8 @@ async function renderMix(o){
  ctx();const sr=48000,spb=60/S.bpm;let from=0,end=D.total,key=null;
  if(o.range==='phrase'){const p=D.byKey[o.key];if(!p)throw new Error('找不到当前乐句');key=p.key;from=p.start;end=p.end}
  if(end<=from)throw new Error('没有可导出的内容');
+ // export until the takes' audio ends, not just at the written end
+ D.phrases.forEach(p=>{if((key&&p.key!==key)||p.status!=='done')return;const t=activeTake(p.key);if(t)end=Math.max(end,takeEnd(t,p))});
  let sec=(end-from)*spb+1.6;if(o.backing&&S.backing&&!key)sec=Math.max(sec,S.backing.buffer.duration+.3);
  const oc=new OfflineAudioContext(2,Math.ceil(sec*sr),sr);
  const comp=oc.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(oc.destination);const bus=oc.createGain();bus.connect(comp);
