@@ -3,7 +3,15 @@ name: Build Windows app
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ['v*']
+    paths:
+      - 'index.html'
+      - 'desktop/**'
+      - '.github/workflows/build-windows.yml'
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -17,6 +25,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
 
       - name: Install dependencies
         run: npm install
@@ -24,8 +34,16 @@ jobs:
       - name: Build installer and portable exe
         run: npm run dist
 
+      - name: Verify executables
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem dist -Filter *.exe
+          if ($files.Count -lt 2) { throw "Expected Setup and Portable executables" }
+          $files | ForEach-Object { Write-Host "$($_.Name): $($_.Length) bytes" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: VocalRender-Studio-windows
           path: desktop/dist/*.exe
+          retention-days: 30
           if-no-files-found: error
