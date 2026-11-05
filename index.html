@@ -1735,18 +1735,50 @@ function enqueue(key,quiet){const p=D.byKey[key];if(!p||!renderable(p))return;
 function pump(){const conc=Math.max(1,Math.min(4,+S.service.conc||1));
  while(working.size<conc&&queue.length){const key=queue.shift(),r=S.renders[key];if(r&&r.job&&r.job.state==='queued')runJob(key,r)}}
 async function runJob(key,r){
- working.add(key);r.job.state='rendering';const t0=performance.now();renderAll();
+ let miss=[];working.add(key);r.job.state='rendering';const t0=performance.now();renderAll();
  try{
   const res=await Client.render(r.job.request,pr=>{if(!r.job)return;r.job.progress=pr;liveProgress(key)},r.job);
   if(!r.job)throw new Error('cancelled');
   const seed=r.job.request.generation.seed??res.seed;
   const t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),n:(r.takes.reduce((m,x)=>Math.max(m,x.n),0))+1,seed,hash:r.job.hash,params:r.job.request.generation,ckpt:r.job.request.checkpoint,voice:(allVoices().find(v=>v.id===r.job.voiceId)||voiceObj()).name,at:Date.now(),buffer:res.buffer||null,snap:r.job.snap,f0:res.f0||null};
   noteRate((performance.now()-t0)/1000,r.job.sec);
-  r.takes.push(t);r.active=t.id;r.job=null;
+  r.takes.push(t);r.active=t.id;r.job=null;miss=skippedLines(t);
  }catch(err){if(r.job){r.job=null;if(err.message!=='cancelled')toast('渲染失败：'+err.message,'err')}}
  working.delete(key);renderAll();
+ if(miss.length)isolateSkipped(key,miss);
  if(!queue.length&&!working.size&&!Object.values(S.renders).some(x=>x.job)&&!autoRun)toast('渲染完成');
  pump();
+}
+// The model sometimes drops a whole line when one request holds several lines (rests inside the phrase, e.g. "尽量长段"):
+// it sings line 1 and goes straight on to line 3. Aligning the take's pitch curve to the score shows it: the dropped
+// line gets squeezed into almost no audio and almost no voiced frames. Returns the dropped lines as [first, last] snapshot indexes.
+function skippedLines(t){
+ if(!t||!t.f0||!t.f0.vals||!t.snap)return[];
+ const sn=t.snap.notes,lines=[];let a=-1;
+ sn.forEach((n,i)=>{const sp=!n[3]&&n[4]==='SP';if(sp){if(a>=0)lines.push([a,i-1]);a=-1}else if(a<0)a=i});
+ if(a>=0)lines.push([a,sn.length-1]);
+ const sung=lines.filter(([x,y])=>sn.slice(x,y+1).some(n=>n[3]));if(sung.length<2)return[];
+ const perf=takePerf(t),spb=60/t.snap.bpm,hop=perf.hop,vals=perf.vals;
+ return sung.filter(([x,y])=>{
+  const written=(sn[y][0]+sn[y][1]-sn[x][0])*spb,sungSec=sn.slice(x,y+1).reduce((m,n)=>m+(n[3]?n[1]*spb:0),0);
+  if(sungSec<.8)return false;
+  const s=perf.notes[x].s,e=perf.notes[y].e;let voiced=0;
+  for(let k=Math.floor(s/hop),k1=Math.min(vals.length,Math.ceil(e/hop));k<k1;k++)if(vals[k]!=null&&!isNaN(vals[k]))voiced++;
+  return e-s<written*.35&&voiced*hop<sungSec*.35})}
+// Split the dropped lines off into their own requests (break marks on the rests around them, undoable) and render again
+function isolateSkipped(key,miss){
+ const r=S.renders[key],t=r&&activeTake(key);if(!t)return;
+ const sn=t.snap.notes,at=new Map(S.events.map((e,i)=>[e.id,i])),cut=new Set();
+ miss.forEach(([x,y])=>{[x-1,y+1].forEach(k=>{const n=sn[k];if(!n||n[3]||n[4]!=='SP')return;const i=at.get(n[5]);if(i!=null&&S.events[i].kind==='rest')cut.add(restRun(i)[0])})});
+ const old=D.byKey[key];if(!cut.size||!old)return;
+ const span=[old.start,old.end],lines=miss.map(([x])=>sn[x][4]==='AP'?(sn[x+1]||sn[x])[4]:sn[x][4]);
+ commit(()=>cut.forEach(a=>{const[, b]=restRun(a);for(let k=a;k<=b;k++)delete S.events[k].seg;S.events[a].seg='break'}));
+ const near=()=>pendingPhrases().filter(p=>p.start<span[1]&&p.end>span[0]);
+ if(reuseTakes(near()))renderAll();
+ near().forEach(p=>enqueue(p.key,true));
+ queue.sort((a,b)=>((D.byKey[a]||{start:1e9}).start)-((D.byKey[b]||{start:1e9}).start));
+ renderAll();pump();
+ toast(`P${old.n} 渲染时模型跳过了${miss.length>1?miss.length+' 句（第一句':'一句（'}从“${lines[0]}”开始），已在这句前后断句并重新渲染，Ctrl+Z 可撤销`);
 }
 // rendering speed (seconds of work per second of audio), remembered per service to estimate waiting time
 function rateKey(){return 'vrstudio.rate.'+(S.service.mode==='demo'?'demo':S.service.base)}
