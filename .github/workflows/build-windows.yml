@@ -11,7 +11,7 @@ on:
       - '.github/workflows/build-windows.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -35,13 +35,46 @@ jobs:
       - name: Verify executables
         shell: pwsh
         run: |
-          $files = Get-ChildItem dist -Filter *.exe
-          if ($files.Count -lt 2) { throw "Expected Setup and Portable executables" }
-          $files | ForEach-Object { Write-Host "$($_.Name): $($_.Length) bytes" }
+          $setup = @(Get-ChildItem dist -Filter '*-Setup.exe')
+          $portable = @(Get-ChildItem dist -Filter '*-Portable.exe')
+          if ($setup.Count -ne 1 -or $portable.Count -ne 1) {
+            throw "Expected exactly one Setup.exe and one Portable.exe"
+          }
+          $setup + $portable | ForEach-Object { Write-Host "$($_.Name): $($_.Length) bytes" }
 
-      - uses: actions/upload-artifact@v4
+      - name: Prepare stable portable filename
+        shell: pwsh
+        run: |
+          $portable = Get-ChildItem dist -Filter '*-Portable.exe' | Select-Object -First 1
+          Copy-Item $portable.FullName (Join-Path $portable.DirectoryName 'VocalRender-Studio-Portable.exe')
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
         with:
-          name: VocalRender-Studio-windows
-          path: desktop/dist/*.exe
+          name: VocalRender-Studio-Setup
+          path: desktop/dist/*-Setup.exe
           retention-days: 30
           if-no-files-found: error
+
+      - name: Upload portable EXE separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalRender-Studio-Portable
+          path: desktop/dist/VocalRender-Studio-Portable.exe
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Publish stable portable download link
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view portable-latest *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create portable-latest --target "$env:GITHUB_SHA" --title "Portable (latest successful build)" --notes "Automatically updated after successful main-branch builds. Download VocalRender-Studio-Portable.exe." --prerelease
+            if ($LASTEXITCODE -ne 0) { throw "Unable to create portable release" }
+          }
+          gh release upload portable-latest "dist/VocalRender-Studio-Portable.exe" --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Unable to upload portable EXE" }
