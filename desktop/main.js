@@ -29,12 +29,12 @@ function titleBarOverlay() {
   return { color: '#00000000', symbolColor: nativeTheme.shouldUseDarkColors ? '#ffffff' : '#1b1b1b', height: TITLEBAR_HEIGHT };
 }
 function projectArg(argv) {
-  return argv.slice(1).find(a => !a.startsWith('-') && /\.(vrproj|json|mid|midi|kar)$/i.test(a)) || null;
+  return argv.slice(1).find(a => !a.startsWith('-') && /\.(vrproj|json|mid|midi|kar|musicxml|mxl|xml)$/i.test(a)) || null;
 }
 const safeName = n => String(n || '未命名').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
 
 async function readProject(p) {
-  if (/\.(mid|midi|kar)$/i.test(p)) { // MIDI is binary: the page imports it
+  if (/\.(mid|midi|kar|musicxml|mxl|xml)$/i.test(p)) { // MIDI / MusicXML (.mxl is zipped): the page decodes and imports it
     const buf = await fs.readFile(p);
     return { path: p, name: path.basename(p), b64: buf.toString('base64') };
   }
@@ -159,8 +159,9 @@ ipcMain.handle('vr:open', async () => {
     defaultPath: app.getPath('documents'),
     properties: ['openFile'],
     filters: [
-      { name: 'VocalRender 工程或乐谱', extensions: ['vrproj', 'json', 'mid', 'midi', 'kar'] },
+      { name: 'VocalRender 工程或乐谱', extensions: ['vrproj', 'json', 'musicxml', 'mxl', 'xml', 'mid', 'midi', 'kar'] },
       { name: 'VocalRender 工程', extensions: ['vrproj'] },
+      { name: 'MusicXML', extensions: ['musicxml', 'mxl', 'xml'] },
       { name: 'MIDI', extensions: ['mid', 'midi', 'kar'] },
       { name: 'JSON 乐谱 / 转写', extensions: ['json', 'txt'] },
     ],

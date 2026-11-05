@@ -564,7 +564,7 @@ html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
             <div class="vol">音量<input id="bVol" type="range" min="0" max="1" step="0.01" value="0.7"></div>
           </div>
           <input type="file" id="bkFile" accept="audio/*" hidden>
-          <input type="file" id="projFile" accept=".vrproj,.json,.txt,.mid,.midi,.kar" hidden>
+          <input type="file" id="projFile" accept=".vrproj,.json,.txt,.mid,.midi,.kar,.musicxml,.mxl,.xml" hidden>
         </section>
         <section class="sec">
           <div class="sec-h"><h3>参考声线</h3><span class="tag">2–8 秒清唱</span></div>
@@ -704,7 +704,7 @@ function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1
 function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
 // Editor preferences, remembered per browser / per desktop install
-const PREFS=Object.assign({clickLocate:true,returnOnStop:true,follow:true,showRef:true,alignAudio:true,autoRender:false,scaleHL:true,scaleSnap:false,segLines:false},store.get('vrstudio.prefs')||{});
+const PREFS=Object.assign({clickLocate:true,returnOnStop:true,follow:true,showRef:true,autoRender:false,scaleHL:true,scaleSnap:false,segLines:false},store.get('vrstudio.prefs')||{});
 const savePrefs=()=>store.set('vrstudio.prefs',PREFS);
 
 /* ================= state ================= */
@@ -1114,9 +1114,7 @@ function simulateSeg(mode){const keep=S.gen.segMode;S.gen.segMode=mode;let r;try
  return{n:r.phrases.length,max:secs.length?Math.max(...secs):0,need:need.length,needSec:need.reduce((a,p)=>a+(p.end-p.start)*60/S.bpm,0)}}
 const SEG_LABEL={rest:'每个休止断句',short:'短休止不断',long:'尽量长段'};
 function segHTML(){const g=S.gen,ph=D.phrases,secs=ph.map(p=>(p.end-p.start)*60/S.bpm),avg=secs.length?secs.reduce((a,b)=>a+b)/secs.length:0,mx=secs.length?Math.max(...secs):0;
- return `<div class="fld"><div class="lab">播放与渲染</div>
-  <label class="row chk"><input type="checkbox" id="alignAudio" ${PREFS.alignAudio?'checked':''}> 人声对齐到乐谱节奏（播放和导出）</label>
-  <p class="hint" style="margin:0 0 6px 24px">模型按自己的节奏唱：开头有静音，休止和换气会变长或变短。开启后按每个音的位置轻微拉伸（音高不变），配伴奏时更整齐。</p>
+ return `<div class="fld"><div class="lab">渲染</div>
   <label class="row chk"><input type="checkbox" id="autoRender" ${PREFS.autoRender?'checked':''}> 改动后自动渲染（停止编辑约 3 秒后）</label></div>
   <div class="fld"><div class="lab">分句方式 <span class="hint">每一句单独提交生成</span></div>
   <div class="segs" id="segMode"><button data-seg="rest" class="${g.segMode==='rest'?'on':''}">每个休止断句</button><button data-seg="short" class="${g.segMode==='short'?'on':''}">短休止不断</button><button data-seg="long" class="${g.segMode==='long'?'on':''}">尽量长段</button></div>
@@ -1531,11 +1529,10 @@ function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
   const take=forceTake||(opt.exp||p.status==='done'||p.status==='stale'?activeTake(p.key):null);
   const useVoice=take&&(forceTake||opt.exp||p.status==='done');
   if(opt.exp&&!useVoice)return;
-  if(useVoice&&take.buffer){const al=PREFS.alignAudio&&take.f0,buf=al?alignedBuffer(take,p):take.buffer,lead=!al&&take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<buf.duration){const s=c.createBufferSource();s.buffer=buf;s.connect(vg);s.start(st,off);sink.push(s)}return}
+  if(useVoice&&take.buffer){const buf=take.buffer,lead=take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<buf.duration){const s=c.createBufferSource();s.buffer=buf;s.connect(vg);s.start(st,off);sink.push(s)}return}
   const v=voiceObj();
   if(useVoice){const perf=takePerf(take,p);const ps=p.start*spb,fsec=fromBeat*spb,vopts={vibRate:5.5,vibDepth:0,fs:v.fs||1,vol:1};
-   const A=PREFS.alignAudio;
-   perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+(A?n.sb*spb:n.s),full=A?n.b*spb:n.e-n.s,off=Math.max(0,fsec-a),dur=full-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
+   perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+n.s,full=n.e-n.s,off=Math.max(0,fsec-a),dur=full-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
     if(!n.k){later(st,()=>sink.push(...breathNode(c,vg,st,dur,1)));return}
     const k0=Math.round((n.s+off/full*(n.e-n.s))/perf.hop),k1=Math.max(k0+2,Math.round(n.e/perf.hop));const cur=new Float32Array(k1-k0);
     for(let k=k0;k<k1;k++){const m=perf.vals[k];cur[k-k0]=hz(m==null||isNaN(m)?n.p:m)}
@@ -1568,7 +1565,7 @@ function togglePlay(){if(audio.playing){pause();if(PREFS.returnOnStop&&audio.sta
 function stopNodes(){clearInterval(audio.timer);audio.jobs=[];audio.ji=0;audio.nodes.forEach(n=>{try{n.stop?n.stop():0}catch(e){}try{n.disconnect()}catch(e){}});audio.nodes=[];cancelAnimationFrame(audio.raf)}
 function pause(){stopNodes();audio.playing=false;renderTopbar();renderRuler()}
 function stop(){pause();setPlayhead(0);roll.scrollLeft=0}
-function seek(b){const was=audio.playing;if(was)pause();setPlayhead(Math.max(0,b));if(was)play();if(queue.length>1)sortQueue()}
+function seek(b){const was=audio.playing;if(was)pause();setPlayhead(Math.max(0,b));if(was)play()}
 function setPlayhead(b,follow){S.playhead=b;const x=b*S.ppb+'px';['phGrid','phRuler','phLanes'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.left=x});
  $('#tcBar').textContent=posStr(b);$('#tcTime').textContent=fmtTime(b*60/S.bpm);
  if(follow&&PREFS.follow&&!scrub){const px=b*S.ppb;if(px>roll.scrollLeft+roll.clientWidth-60||px<roll.scrollLeft)roll.scrollLeft=px-60}}
@@ -1715,36 +1712,11 @@ async function exportScore(kind){if(!S.events.some(e=>e.kind==='note'))return to
     if(navigator.clipboard)navigator.clipboard.writeText(txt).then(()=>toast('已复制'),sel);else sel()}})}
  catch(e){toast('导出失败：'+e.message,'err')}}
 
-/* ================= align rendered vocals to the score ================= */
-// WSOLA time-stretch (keeps pitch) along a piecewise-linear map [outSec, inSec]
-function wsola(inp,sr,map,outLen){
- const N=Math.round(sr*.04)&~1,H=N/2,tol=Math.round(sr*.008),win=new Float32Array(N);for(let i=0;i<N;i++)win[i]=.5-.5*Math.cos(2*Math.PI*i/N);
- const out=new Float32Array(outLen+N),norm=new Float32Array(outLen+N);let mi=0,prev=-1;
- const inAt=t=>{while(mi<map.length-2&&map[mi+1][0]<=t)mi++;const[a0,b0]=map[mi],[a1,b1]=map[Math.min(mi+1,map.length-1)];return a1>a0?b0+(Math.min(t,a1)-a0)/(a1-a0)*(b1-b0):b0};
- for(let o=0;o<outLen;o+=H){let ip=Math.round(inAt(o/sr)*sr);
-  if(prev>=0){const nat=prev+H;if(nat+N<=inp.length){let best=ip,bc=-Infinity;   // pick the offset that continues the previous frame most smoothly
-    for(let d=-tol;d<=tol;d+=2){const c0=ip+d;if(c0<0||c0+N>inp.length)continue;let c=0;for(let k=0;k<N;k+=4)c+=inp[c0+k]*inp[nat+k];if(c>bc){bc=c;best=c0}}ip=best}}
-  ip=Math.max(0,Math.min(inp.length-N,ip));
-  for(let k=0;k<N;k++){out[o+k]+=inp[ip+k]*win[k];norm[o+k]+=win[k]}prev=ip}
- for(let i=0;i<outLen;i++)if(norm[i]>1e-3)out[i]/=norm[i];
- return out.subarray(0,outLen)}
-// A take's audio re-timed so each note (from the pitch alignment) starts and ends where the score says; cached on the take
-function alignedBuffer(take,p){const perf=takePerf(take,p),b=take.buffer,ns=perf.notes;if(!b||!ns.length)return b;
- const key=ns.map(n=>n.s.toFixed(3)).join(',');if(take._al&&take._al.key===key)return take._al.buf;
- const spb=60/perf.bpm,sr=b.sampleRate,map=[];let lo=-1;
- ns.forEach(n=>{const o=n.sb*spb;if(o>lo+1e-4){map.push([o,Math.max(0,n.s)]);lo=o}});
- const last=ns[ns.length-1],oe=(last.sb+last.b)*spb;if(oe>lo+1e-4)map.push([oe,Math.min(b.duration,last.e)]);
- const tail=Math.max(0,Math.min(1,b.duration-last.e));map.push([oe+tail+1e-3,Math.min(b.duration,last.e+tail)]);
- let mono=b.getChannelData(0);if(b.numberOfChannels>1){const m=new Float32Array(b.length),r=b.getChannelData(1);for(let i=0;i<m.length;i++)m[i]=(mono[i]+r[i])/2;mono=m}
- const outLen=Math.ceil(map[map.length-1][0]*sr),out=wsola(mono,sr,map,outLen),buf=new AudioBuffer({length:Math.max(1,outLen),sampleRate:sr,numberOfChannels:1});
- buf.copyToChannel(out,0);take._al={key,buf};return buf}
-
 /* ================= render service ================= */
 const queue=[],working=new Set();
 function renderable(p){return p.status!=='error'&&p.status!=='queued'&&p.status!=='rendering'&&p.idx.some(i=>S.events[i].kind==='note')}
-// phrases at or after the playhead first, then the ones before it
-const prio=p=>p.end>S.playhead?p.start:1e6+p.start;
-function sortQueue(){queue.sort((a,b)=>prio(D.byKey[a]||{start:1e9,end:1e9})-prio(D.byKey[b]||{start:1e9,end:1e9}))}
+// phrases are rendered in score order (P1, P2, …)
+const prio=p=>p.start;
 // a phrase whose current score/settings match an earlier take just switches back to it
 function reuseTakes(list){let n=0;list.forEach(p=>{const r=S.renders[p.key];const t=r&&[...r.takes].reverse().find(x=>x.hash===p.hash);if(t){r.active=t.id;n++}});return n}
 function pendingPhrases(){return D.phrases.filter(p=>(p.status==='none'||p.status==='stale')&&renderable(p))}
@@ -1755,7 +1727,7 @@ function renderPending(){
  const reused=reuseTakes(list);if(reused){renderAll();list=pendingPhrases()}
  if(!list.length)return toast(reused?`${reused} 句直接用回了之前的版本，没有需要渲染的了`:errs?`${errs} 个乐句有错误，修正后才能渲染`:'所有乐句都是最新的');
  list.sort((a,b)=>prio(a)-prio(b)).forEach(p=>enqueue(p.key,true));renderAll();pump();
- toast([reused?`${reused} 句用回了之前的版本`:'',errs?`已跳过 ${errs} 个有错误的乐句`:''].filter(Boolean).join('，')||`开始渲染 ${list.length} 句，从播放头附近开始`);
+ toast([reused?`${reused} 句用回了之前的版本`:'',errs?`已跳过 ${errs} 个有错误的乐句`:''].filter(Boolean).join('，')||`开始渲染 ${list.length} 句，按乐句顺序进行`);
 }
 function enqueue(key,quiet){const p=D.byKey[key];if(!p||!renderable(p))return;
  const gl=D.issues.find(x=>x.global&&x.lv==='err');if(gl)return toast(gl.msg,'err');
@@ -1771,7 +1743,6 @@ async function runJob(key,r){
   const t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),n:(r.takes.reduce((m,x)=>Math.max(m,x.n),0))+1,seed,hash:r.job.hash,params:r.job.request.generation,ckpt:r.job.request.checkpoint,voice:(allVoices().find(v=>v.id===r.job.voiceId)||voiceObj()).name,at:Date.now(),buffer:res.buffer||null,snap:r.job.snap,f0:res.f0||null};
   noteRate((performance.now()-t0)/1000,r.job.sec);
   r.takes.push(t);r.active=t.id;r.job=null;
-  if(t.buffer&&t.f0&&PREFS.alignAudio)setTimeout(()=>{const p=D.byKey[key];if(p)try{alignedBuffer(t,p)}catch(e){}},30);   // prepare aligned audio ahead of playback
  }catch(err){if(r.job){r.job=null;if(err.message!=='cancelled')toast('渲染失败：'+err.message,'err')}}
  working.delete(key);renderAll();
  if(!queue.length&&!working.size&&!Object.values(S.renders).some(x=>x.job)&&!autoRun)toast('渲染完成');
@@ -1863,9 +1834,9 @@ $('#overlay').addEventListener('click',e=>{if(e.target.closest('[data-close]')||
 const MENUS={
  file:[['新建空白工程',DESK?'Ctrl+N':'',()=>newProject()],['打开工程文件…','Ctrl+O',()=>openProject()],...(DESK?[['保存','Ctrl+S',()=>saveProject(false)],['另存为…','Ctrl+Shift+S',()=>saveProject(true)]]:[]),0,
   ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};S.refF0=null;renderAll();toast('已载入示例')}],0,
-  ['导入乐谱（MIDI / JSON）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],['导出乐谱（MIDI）…','',()=>exportScore('mid')],['导出乐谱（VocalRender JSON）…','',()=>exportScore('json')],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
+  ['导入乐谱（MusicXML / MIDI / JSON）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],['导出乐谱（MIDI）…','',()=>exportScore('mid')],['导出乐谱（VocalRender JSON）…','',()=>exportScore('json')],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
  edit:()=>[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending],0,
-  ['移调…','K',()=>transposeDlg()],0,['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.alignAudio?'✓ ':'')+'人声对齐到乐谱节奏','',()=>{PREFS.alignAudio=!PREFS.alignAudio;savePrefs();renderInspector();toast(PREFS.alignAudio?'播放和导出时人声对齐到乐谱节奏':'播放和导出使用模型原始节奏')}],[(PREFS.autoRender?'✓ ':'')+'改动后自动渲染','',()=>{PREFS.autoRender=!PREFS.autoRender;savePrefs();renderInspector();renderStatus();if(PREFS.autoRender){toast('停止编辑约 3 秒后自动渲染改动的乐句');scheduleAuto()}else toast('已关闭自动渲染')}],0,[(PREFS.scaleHL?'✓ ':'')+'高亮调内音','',()=>{PREFS.scaleHL=!PREFS.scaleHL;savePrefs();renderAll()}],[(PREFS.scaleSnap?'✓ ':'')+'拖动时吸附调内音','',()=>{PREFS.scaleSnap=!PREFS.scaleSnap;savePrefs();renderAll()}],[(PREFS.segLines?'✓ ':'')+'显示乐句边界线','',()=>{PREFS.segLines=!PREFS.segLines;savePrefs();renderRoll()}],0,[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
+  ['移调…','K',()=>transposeDlg()],0,['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.autoRender?'✓ ':'')+'改动后自动渲染','',()=>{PREFS.autoRender=!PREFS.autoRender;savePrefs();renderInspector();renderStatus();if(PREFS.autoRender){toast('停止编辑约 3 秒后自动渲染改动的乐句');scheduleAuto()}else toast('已关闭自动渲染')}],0,[(PREFS.scaleHL?'✓ ':'')+'高亮调内音','',()=>{PREFS.scaleHL=!PREFS.scaleHL;savePrefs();renderAll()}],[(PREFS.scaleSnap?'✓ ':'')+'拖动时吸附调内音','',()=>{PREFS.scaleSnap=!PREFS.scaleSnap;savePrefs();renderAll()}],[(PREFS.segLines?'✓ ':'')+'显示乐句边界线','',()=>{PREFS.segLines=!PREFS.segLines;savePrefs();renderRoll()}],0,[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
  help:[['新手引导','',()=>startTour(0)],['批量歌词怎么用','',()=>startTour(TOUR.findIndex(t=>t.id==='lyrics'))],0,['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
 let openMenu=null;
 // items: [label, shortcut, action, disabled] or 0 for a separator
@@ -2055,31 +2026,122 @@ function midiSegment(info,pt,bpm,legato){
  const total=out.reduce((t,x)=>t+x.d,0);
  return{seg:{name:pt.name,lang:'',start:0,total,notes:out,f0:null,f0hop:null,count:notes.length},chords,withLyric,noteCount:notes.length};
 }
+/* ================= MusicXML (.musicxml / .xml / .mxl) ================= */
+// .mxl is a zip: read the central directory and inflate with the browser's DecompressionStream
+async function unzip(u8){const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);let e=u8.length-22;
+ while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;if(e<0)throw new Error('不是有效的 .mxl 压缩包');
+ const n=dv.getUint16(e+10,true),out={};let p=dv.getUint32(e+16,true);
+ for(let i=0;i<n&&p+46<=u8.length;i++){if(dv.getUint32(p,true)!==0x02014b50)break;
+  const method=dv.getUint16(p+10,true),csize=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+  const name=new TextDecoder().decode(u8.subarray(p+46,p+46+nl));p+=46+nl+xl+cl;
+  const d0=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true);out[name]={method,raw:u8.subarray(d0,d0+csize)}}
+ return out}
+async function unzipFile(f){if(f.method===0)return f.raw;if(f.method!==8)throw new Error('.mxl 使用了不支持的压缩方式');
+ if(typeof DecompressionStream==='undefined')throw new Error('当前浏览器不能解压 .mxl，请在打谱软件里导出未压缩的 .musicxml');
+ return new Uint8Array(await new Response(new Blob([f.raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())}
+function decodeXml(u8){
+ if(u8[0]===0xFF&&u8[1]===0xFE)return new TextDecoder('utf-16le').decode(u8);if(u8[0]===0xFE&&u8[1]===0xFF)return new TextDecoder('utf-16be').decode(u8);
+ const head=String.fromCharCode(...u8.subarray(0,200)),m=head.match(/encoding=["']([\w-]+)["']/i);
+ try{return new TextDecoder(m?m[1]:'utf-8').decode(u8)}catch(e){return new TextDecoder().decode(u8)}}
+async function musicXmlText(u8){
+ if(u8[0]===0x50&&u8[1]===0x4B){const z=await unzip(u8);let root=null;
+  if(z['META-INF/container.xml']){const c=decodeXml(await unzipFile(z['META-INF/container.xml'])).match(/full-path=["']([^"']+)["']/);if(c)root=c[1]}
+  if(!root||!z[root])root=Object.keys(z).find(k=>!k.startsWith('META-INF')&&/\.(xml|musicxml)$/i.test(k));
+  if(!root)throw new Error('.mxl 里没有找到乐谱文件');return decodeXml(await unzipFile(z[root]))}
+ return decodeXml(u8)}
+const isXmlText=t=>/<score-(partwise|timewise)[\s>]/.test(t);
+// MusicXML -> the same structure midiInfo() returns, so the MIDI import dialog and quantizer handle it.
+// Positions are ticks at XML_DIV per quarter; tied notes are merged; each voice of a part becomes its own choice.
+const XML_DIV=480,STEP_PC={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+function musicXmlInfo(text,fname){
+ const doc=new DOMParser().parseFromString(text,'application/xml'),pe=doc.getElementsByTagName('parsererror')[0];
+ if(pe){const m=(pe.textContent||'').match(/line (\d+)/);throw new Error('XML 格式有误'+(m?`（第 ${m[1]} 行附近）`:'')+'，文件可能不完整，请重新导出')}
+ const root=doc.documentElement;
+ if(root.nodeName==='score-timewise')throw new Error('暂不支持 timewise 结构的 MusicXML，请在打谱软件里重新导出（默认就是 partwise）');
+ if(root.nodeName!=='score-partwise')throw new Error('不是 MusicXML 乐谱（缺少 score-partwise）');
+ const ch=(el,n)=>{if(!el)return null;for(const c of el.children)if(c.nodeName===n)return c;return null},chs=(el,n)=>el?[...el.children].filter(c=>c.nodeName===n):[];
+ const tx=(el,...path)=>{let x=el;for(const n of path){x=ch(x,n);if(!x)return null}return x.textContent.trim()};
+ const names={};doc.querySelectorAll('part-list > score-part').forEach((sp,i)=>{const n=tx(sp,'part-name');names[sp.getAttribute('id')]=n&&!/^(musicxml part|part ?\d*|未命名)$/i.test(n)?n:(tx(sp,'part-abbreviation')||`声部 ${i+1}`)});
+ const tempos=[],sigs=[];let key=null,repeats=false,pickup=0,full=4;
+ const T=q=>Math.round(q*XML_DIV),parts=[];
+ chs(root,'part').forEach((part,pi)=>{
+  let div=1,mStart=0,barQ=4;const voices={},ties={};
+  chs(part,'measure').forEach((ms,mi)=>{let cur=0,max=0,last=0;
+   for(const el of ms.children){const n=el.nodeName;
+    if(n==='attributes'){const d=tx(el,'divisions');if(d&&+d>0)div=+d;
+     const tm=ch(el,'time');if(tm){const b=parseInt(tx(tm,'beats')),bt=parseInt(tx(tm,'beat-type'));if(b>0&&bt>0){barQ=b*4/bt;if(pi===0){sigs.push({tick:T(mStart+cur),num:b,den:bt});if(mi===0)full=barQ}}}
+     const k=ch(el,'key');if(k&&!key&&tx(k,'fifths')!=null){const f=parseInt(tx(k,'fifths')),maj=((f*7)%12+12)%12,mode=/minor/i.test(tx(k,'mode')||'')?'min':'maj';key={mode,r:mode==='maj'?maj:(maj+9)%12}}}
+    else if(n==='direction'||n==='sound'){const snd=n==='sound'?el:ch(el,'sound'),t=snd&&snd.getAttribute('tempo');
+     let bpm=t?+t:0;if(!bpm&&n==='direction'){const mt=el.querySelector('metronome'),pm=mt&&tx(mt,'per-minute');if(pm&&+pm>0){const u=tx(mt,'beat-unit'),f={whole:4,half:2,quarter:1,eighth:.5,'16th':.25}[u]||1;bpm=+pm*f*(ch(mt,'beat-unit-dot')?1.5:1)}}
+     if(bpm>0&&pi===0)tempos.push({tick:T(mStart+cur),bpm})}
+    else if(n==='backup'){cur-=(+tx(el,'duration')||0)/div}
+    else if(n==='forward'){cur+=(+tx(el,'duration')||0)/div;max=Math.max(max,cur)}
+    else if(n==='barline'){if(ch(el,'repeat')||ch(el,'ending'))repeats=true}
+    else if(n==='note'){
+     if(ch(el,'grace'))continue;   // grace notes take no time
+     const dur=(+tx(el,'duration')||0)/div,chord=!!ch(el,'chord'),st=chord?last:cur;
+     if(!chord){last=cur;cur+=dur;max=Math.max(max,cur)}
+     const pt=ch(el,'pitch');if(!pt||ch(el,'cue')||dur<=0)continue;   // rests, unpitched and cue notes
+     const midi=(+tx(pt,'octave')+1)*12+STEP_PC[tx(pt,'step')]+Math.round(+(tx(pt,'alter')||0));if(!(midi>=0&&midi<128))continue;
+     const v=(tx(el,'voice')||'1')+(tx(el,'staff')?'/'+tx(el,'staff'):''),V=voices[v]=voices[v]||{notes:[],lyrics:[]};
+     const tieT=[...chs(el,'tie'),...el.querySelectorAll('notations > tied')].map(x=>x.getAttribute('type'));
+     const s0=T(mStart+st),e0=T(mStart+st+dur),tk=v+'_'+midi,open=ties[tk];
+     if(tieT.includes('stop')&&open&&Math.abs(open.e-s0)<=XML_DIV/16){open.e=e0;if(!tieT.includes('start'))delete ties[tk];continue}
+     const note={s:s0,e:e0,p:midi};V.notes.push(note);if(tieT.includes('start'))ties[tk]=note;
+     const lys=chs(el,'lyric');const ly=lys.find(l=>(l.getAttribute('number')||'1')==='1')||lys[0];
+     if(ly){const w=cleanLyric(chs(ly,'text').map(x=>x.textContent).join(''));if(w)V.lyrics.push({tick:s0,s:w})}}}
+   if(pi===0&&mi===0&&max>0&&max<full-1e-6)pickup=full-max;   // anacrusis: shift so bar 2 starts on a bar line
+   mStart+=max>0?max:barQ});
+  const vk=Object.keys(voices).filter(k=>voices[k].notes.length);
+  vk.forEach(k=>{const V=voices[k],notes=V.notes.sort((a,b)=>a.s-b.s||b.p-a.p);let poly=0;for(let i=1;i<notes.length;i++)if(notes[i].s<notes[i-1].e-XML_DIV/32)poly++;
+   const ps=notes.map(n=>n.p),nm=names[part.getAttribute('id')]||`声部 ${pi+1}`;
+   parts.push({ti:pi,ch:0,name:nm+(vk.length>1?` · 声部 ${k.split('/')[0]}`:''),notes,lyrics:V.lyrics,poly,lo:Math.min(...ps),hi:Math.max(...ps)})})});
+ if(!parts.length)throw new Error('乐谱里没有找到音符');
+ if(pickup>0){const sh=T(pickup);parts.forEach(pt=>{pt.notes.forEach(n=>{n.s+=sh;n.e+=sh});pt.lyrics.forEach(l=>l.tick+=sh)})}
+ tempos.sort((a,b)=>a.tick-b.tick);sigs.sort((a,b)=>a.tick-b.tick);
+ const bpm=tempos.length?Math.round(tempos[0].bpm):S.bpm,changes=new Set(tempos.map(x=>Math.round(x.bpm))).size-1;
+ const best=parts.reduce((a,pt)=>(pt.lyrics.length?1e6:0)+pt.notes.length-pt.poly*2>(a.lyrics.length?1e6:0)+a.notes.length-a.poly*2?pt:a,parts[0]);
+ const title=tx(root,'work','work-title')||tx(root,'movement-title')||[...doc.querySelectorAll('credit-words')].map(x=>x.textContent.trim()).find(Boolean)||'';
+ const sw=doc.querySelector('identification software');
+ return{div:XML_DIV,fmt:'xml',label:'MusicXML'+(sw?`（${sw.textContent.trim()}）`:''),bpm:Math.max(40,Math.min(240,bpm)),fileBpm:bpm,noTempo:!tempos.length,changes,sig:sigs[0]||{num:4,den:4},parts,def:parts.indexOf(best),key,repeats,pickup,
+  title:title.slice(0,60)||String(fname||'').replace(/\.(musicxml|xml|mxl)$/i,'')};
+}
 function importDlg(prefill){
- const pm=prefill&&prefill.midi?prefill.midi:null;if(pm)prefill=null;
- dialog('导入乐谱',`<div class="segs" style="margin-bottom:14px"><button data-it="midi" class="${pm?'on':''}">MIDI</button><button data-it="json" class="${pm?'':'on'}">JSON</button><button data-it="xml">MusicXML</button><button data-it="abc">ABC 记谱</button></div>
+ const pm=prefill&&prefill.midi?prefill.midi:null;if(pm)prefill=null;const pmXml=pm&&!isMidiName(pm.name);
+ dialog('导入乐谱',`<div class="segs" style="margin-bottom:14px"><button data-it="midi" class="${pm&&!pmXml?'on':''}">MIDI</button><button data-it="xml" class="${pmXml?'on':''}">MusicXML</button><button data-it="json" class="${pm?'':'on'}">JSON</button><button data-it="abc">ABC 记谱</button></div>
  <div id="impBody"></div>`,`<button class="btn line" data-close>取消</button><button class="btn primary" id="impGo">导入</button>`,o=>{
-  let type=pm?'midi':'json',parsed=null,t=null;const body=o.querySelector('#impBody'),go=o.querySelector('#impGo');
+  let type=pm?(pmXml?'xml':'midi'):'json',parsed=null,t=null;const body=o.querySelector('#impBody'),go=o.querySelector('#impGo');
   const st={sel:null,bpm:90,auto:90,grid:1,ref:true,part:0,legato:true};
   const draw=()=>{parsed=null;go.textContent='导入';go.disabled=false;body.innerHTML=type==='midi'?`<label class="drop" for="impMidi" id="impMidiDrop">选择 .mid / .midi 文件<br><span class="hint">也可以直接把 MIDI 文件拖进窗口</span></label><input type="file" id="impMidi" accept=".mid,.midi,.kar" hidden><div id="impPrev" style="margin-top:12px"></div>`
    :type==='json'?`<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="hint">支持 VocalRender 标注（word / pitch / note / pitch2word / bpm），以及带时长的歌唱转写（text / note_pitch / note_type / duration 秒，可带 time 和 f0）。</span><label class="btn line" for="impJsonFile" style="flex:none">选择文件…</label><input type="file" id="impJsonFile" accept=".json,.txt" hidden></div><textarea id="impText" spellcheck="false" placeholder='粘贴 JSON，或点“选择文件…”'></textarea><div id="impPrev" style="margin-top:12px"></div>`
-   :type==='xml'?`<label class="drop" for="impFile">选择 .musicxml / .xml / .mxl 文件</label><input type="file" id="impFile" accept=".musicxml,.xml,.mxl" hidden><p class="hint" style="margin-top:10px">由服务端 <span class="mono">POST /score/import</span> 解析：自动选择带歌词的单声部，可指定小节范围；非标准时值误差 ≤12.5% 时量化并提示，和弦与重叠声部会报出位置。</p>`
+   :type==='xml'?`<label class="drop" for="impXml" id="impMidiDrop">选择 .musicxml / .xml / .mxl 文件<br><span class="hint">MuseScore、Sibelius、Finale、Dorico 等打谱软件导出的 MusicXML；也可以直接把文件拖进窗口</span></label><input type="file" id="impXml" accept=".musicxml,.xml,.mxl" hidden>
+    <details class="imp-paste" style="margin-top:8px"><summary class="hint" style="cursor:pointer">或者粘贴 MusicXML 文本</summary><textarea id="impXmlText" spellcheck="false" placeholder="<?xml version=&quot;1.0&quot;?>&#10;<score-partwise …>" style="margin-top:6px;min-height:90px"></textarea></details><div id="impPrev" style="margin-top:12px"></div>`
    :`<textarea id="impText" spellcheck="false" placeholder="X:1&#10;L:1/8&#10;Q:1/4=90&#10;K:C&#10;E G A2 G E D2 |&#10;w: 晚 风 吹 过 旧 街"></textarea><p class="hint">由服务端 <span class="mono">POST /score/import</span> 解析，小写 w: 行作为对齐歌词，下划线 _ 表示连音。</p>`;
    if(type==='midi'){o.querySelector('#impMidi').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(f)readMidi(new Uint8Array(await f.arrayBuffer()),f.name)});
     if(pm)readMidi(pm.bytes,pm.name)}
+   if(type==='xml'){o.querySelector('#impXml').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(f)readMidi(new Uint8Array(await f.arrayBuffer()),f.name)});
+    const xt=o.querySelector('#impXmlText');xt.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{const v=xt.value.trim();if(v)readXmlText(v,'粘贴的乐谱');else{prev().innerHTML='';parsed=null}},300)});
+    if(pm)readMidi(pm.bytes,pm.name);else if(prefill&&prefill.xml){xt.value=prefill.xml;xt.closest('details').open=true;readXmlText(prefill.xml,'粘贴的乐谱');prefill=null}}
    if(type==='json'){const ta=o.querySelector('#impText');ta.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(analyse,250)});
     o.querySelector('#impJsonFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;ta.value=await f.text();analyse()});
     if(prefill){ta.value=prefill;prefill=null;analyse()}}};
   const prev=()=>o.querySelector('#impPrev');
-  function readMidi(bytes,name){parsed=null;go.textContent='导入';
-   try{const info=midiInfo(parseMIDI(bytes),name);parsed={kind:'midi',info,name};st.part=info.def;st.bpm=st.auto=info.bpm;const dz=o.querySelector('#impMidiDrop');if(dz)dz.innerHTML=`${esc(name)}<br><span class="hint">点这里换一个文件</span>`;showMidi()}
+  function showScore(info,name){parsed={kind:'midi',info,name};st.part=info.def;st.bpm=st.auto=info.bpm;const dz=o.querySelector('#impMidiDrop');if(dz)dz.innerHTML=`${esc(name)}<br><span class="hint">点这里换一个文件</span>`;showMidi()}
+  function readXmlText(text,name){parsed=null;go.textContent='导入';try{showScore(musicXmlInfo(text,name),name)}catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">无法读取${name?' '+esc(name):''}：${esc(e.message)}</p>`;go.disabled=true}}
+  async function readMidi(bytes,name){parsed=null;go.textContent='导入';
+   if(!(bytes[0]===0x4D&&bytes[1]===0x54&&bytes[2]===0x68&&bytes[3]===0x64)&&(!isMidiName(name)||bytes[0]===0x3C||bytes[0]===0x50||bytes[0]===0xEF||bytes[0]===0xFF||bytes[0]===0xFE)){
+    if(type!=='xml'){type='xml';o.querySelectorAll('[data-it]').forEach(x=>x.classList.toggle('on',x.dataset.it==='xml'));draw()}
+    let text;try{text=await musicXmlText(bytes)}catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">无法读取 ${esc(name)}：${esc(e.message)}</p>`;go.disabled=true;return}
+    if(!isXmlText(text)){prev().innerHTML=`<p class="hint" style="color:var(--err)">无法读取 ${esc(name)}：不是 MusicXML 乐谱（缺少 score-partwise）</p>`;go.disabled=true;return}
+    return readXmlText(text,name)}
+   try{const info=midiInfo(parseMIDI(bytes),name);showScore(info,name)}
    catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">无法读取 ${esc(name)}：${esc(e.message)}</p>`;go.disabled=true}}
   function showMidi(){const I=parsed.info,sigOk=I.sig.den===4&&[2,3,4].includes(I.sig.num);
-   prev().innerHTML=`<div class="imp-stats">识别为 <b>MIDI</b>（格式 ${I.fmt}）· ${I.parts.length} 个旋律声部 · 拍号 ${I.sig.num}/${I.sig.den}${sigOk?'':'（不支持，沿用当前拍号）'} · 文件速度 ${I.fileBpm} BPM${I.changes?`<br><span style="color:var(--warn)">曲中有 ${I.changes} 处变速，统一按开头速度，音符的小节位置不变。</span>`:''}</div>
+   prev().innerHTML=`<div class="imp-stats">识别为 <b>${I.fmt==='xml'?esc(I.label):'MIDI'}</b>${I.fmt==='xml'?'':`（格式 ${I.fmt}）`} · ${I.parts.length} 个${I.fmt==='xml'?'':'旋律'}声部 · 拍号 ${I.sig.num}/${I.sig.den}${sigOk?'':'（不支持，沿用当前拍号）'} · ${I.noTempo?'谱里没有标速度':`文件速度 ${I.fileBpm} BPM`}${I.key?` · ${keyName(I.key)}`:''}${I.pickup?' · 有弱起小节':''}${I.changes?`<br><span style="color:var(--warn)">曲中有 ${I.changes} 处变速，统一按开头速度，音符的小节位置不变。</span>`:''}${I.repeats?`<br><span style="color:var(--warn)">反复记号和跳房子不会展开，按谱面顺序导入。</span>`:''}</div>
     <div class="lab" style="font-size:11.5px;color:var(--fg-2);margin-top:10px">选择人声声部</div>
     <div class="imp-segs">${I.parts.map((pt,i)=>`<label class="imp-seg"><input type="radio" name="impPart" data-part="${i}" ${i===st.part?'checked':''}><span class="nm">${esc(pt.name)}</span><span class="t">${pt.notes.length} 个音 · ${pname(pt.lo)}–${pname(pt.hi)} · ${pt.lyrics.length?(pt.looseLyrics?'歌词在另一条音轨':'有歌词'):'无歌词'}${pt.poly?` · ${pt.poly} 处和弦/重叠`:''}</span></label>`).join('')}</div>
     <div class="row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
-     <div class="fld" style="margin:0"><label for="impBpm">速度 BPM <span class="hint">（文件 ${I.fileBpm}）</span></label><div class="row"><input class="inp mono" id="impBpm" type="number" min="40" max="240" value="${st.bpm}" style="width:90px"><button class="btn line" id="impAuto" ${st.bpm===st.auto?'disabled':''}>恢复</button></div></div>
+     <div class="fld" style="margin:0"><label for="impBpm">速度 BPM <span class="hint">（${I.noTempo?'谱里未标，沿用当前':'文件 '+I.fileBpm}）</span></label><div class="row"><input class="inp mono" id="impBpm" type="number" min="40" max="240" value="${st.bpm}" style="width:90px"><button class="btn line" id="impAuto" ${st.bpm===st.auto?'disabled':''}>恢复</button></div></div>
      <div class="fld" style="margin:0"><div class="lab">量化网格</div><div class="segs" id="impGrid"><button data-g="1" class="${st.grid===1?'on':''}">1/32</button><button data-g="2" class="${st.grid===2?'on':''}">1/16</button></div></div>
     </div>
     <label class="row" style="gap:8px;font-size:12.5px;margin-bottom:10px"><input type="checkbox" id="impLegato" ${st.legato?'checked':''}> 短于 1/16 的空隙并入前一个音（连唱，不另加休止）</label>
@@ -2091,6 +2153,7 @@ function importDlg(prefill){
    prev().querySelector('#impLegato').onchange=e=>{st.legato=e.target.checked;stats()};
    stats()}
   function analyse(){const txt=o.querySelector('#impText').value.trim();parsed=null;go.textContent='导入';if(!txt){prev().innerHTML='';return}
+   if(type==='json'&&/^</.test(txt)&&isXmlText(txt)){type='xml';o.querySelectorAll('[data-it]').forEach(x=>x.classList.toggle('on',x.dataset.it==='xml'));prefill={xml:txt};draw();return}
    let d;try{d=JSON.parse(txt)}catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">不是有效的 JSON：${esc(e.message)}</p>`;return}
    try{
     if(isTranscript(d)){const segs=parseTranscript(d);st.sel=new Set(segs.map((_,i)=>i));st.auto=st.bpm=estimateBpm(segs);parsed={kind:'transcript',segs};showTranscript()}
@@ -2130,14 +2193,14 @@ function importDlg(prefill){
    go.textContent=segs.length>1?`导入 ${segs.length} 个片段`:'导入'}
   draw();o.querySelectorAll('[data-it]').forEach(b=>b.onclick=()=>{type=b.dataset.it;o.querySelectorAll('[data-it]').forEach(x=>x.classList.toggle('on',x===b));draw()});
   go.onclick=()=>{
-   if(type==='midi'){if(!parsed||parsed.kind!=='midi')return toast('先选择一个 MIDI 文件','err');
+   if(type==='midi'||type==='xml'){if(!parsed||parsed.kind!=='midi')return toast(type==='xml'?'先选择或粘贴 MusicXML 乐谱':'先选择一个 MIDI 文件','err');
     const I=parsed.info,q=parsed.q;if(audio.playing)pause();
-    commit(()=>{S.events=q.events;S.bpm=st.bpm;if(sigOkOf(I))S.bpb=I.sig.num;S.sel.clear();S.curPhrase=null});
+    commit(()=>{S.events=q.events;S.bpm=st.bpm;if(sigOkOf(I))S.bpb=I.sig.num;if(I.key)S.key=I.key;S.sel.clear();S.curPhrase=null});
     S.refF0=null;S.name=I.title||S.name;$('#projName').value=S.name;$('#bpm').value=S.bpm;$('#bpb').value=S.bpb;
     closeDialog();setPlayhead(0);renderAll();roll.scrollLeft=0;
     const ps=S.events.filter(e=>e.kind==='note').map(e=>e.pitch);if(ps.length)roll.scrollTop=(MAXP-ps.reduce((a,b)=>a+b)/ps.length)*S.rowH-roll.clientHeight/2;
     toast(`已导入 ${q.notes} 个音符 · ${S.bpm} BPM${parsed.m.withLyric?'':'，用下方“批量歌词”填词'}，可用 Ctrl+Z 撤销${rangeHint()}`);return}
-   if(type!=='json'){toast(S.service.mode==='demo'?'演示模式不解析 MusicXML / ABC，连接服务后可用。可以先导入 MIDI 或 JSON。':'已提交到 /score/import',S.service.mode==='demo'?'err':undefined);return}
+   if(type!=='json'){toast(S.service.mode==='demo'?'演示模式不解析 ABC，连接服务后可用。可以先导入 MusicXML、MIDI 或 JSON。':'已提交到 /score/import',S.service.mode==='demo'?'err':undefined);return}
    if(!parsed){analyse();if(!parsed)return toast('先粘贴或选择一个能识别的 JSON','err')}
    if(parsed.kind==='label'){const{x,ev}=parsed;commit(()=>{S.events=ev;S.bpm=+x.bpm||S.bpm;$('#bpm').value=S.bpm;S.sel.clear()});S.refF0=null;closeDialog();toast(`已导入 ${ev.length} 个事件`);return}
    const segs=chosen();if(!segs.length)return;const q=parsed.q||quantizeTranscript(segs,st.bpm,st.grid);
@@ -2241,13 +2304,13 @@ async function openProject(){
  catch(e){toast('无法打开：'+e.message,'err')}
 }
 function newProject(){confirmDlg('新建空白工程','当前乐谱和渲染版本会被清空。确定继续吗？','新建',()=>{loadProject({events:[],name:'未命名工程',bpm:S.bpm,bpb:S.bpb,voice:S.voice,ckpt:S.ckpt},null)})}
-const isMidiName=n=>/\.(mid|midi|kar)$/i.test(n||'');
-$('#projFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{if(isMidiName(f.name))importDlg({midi:{bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}});else openJSONText(await f.text(),null,f.name)}catch(err){toast('无法打开：'+err.message,'err')}});
+const isMidiName=n=>/\.(mid|midi|kar)$/i.test(n||''),isScoreName=n=>/\.(mid|midi|kar|musicxml|mxl|xml)$/i.test(n||'');
+$('#projFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{if(isScoreName(f.name))importDlg({midi:{bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}});else openJSONText(await f.text(),null,f.name)}catch(err){toast('无法打开：'+err.message,'err')}});
 document.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault()});
 document.addEventListener('drop',e=>{const f=e.dataTransfer&&e.dataTransfer.files[0];if(!f||e.defaultPrevented)return;e.preventDefault();
- if(isMidiName(f.name)){f.arrayBuffer().then(b=>{closeDialog();importDlg({midi:{bytes:new Uint8Array(b),name:f.name}})});return}
+ if(isScoreName(f.name)){f.arrayBuffer().then(b=>{closeDialog();importDlg({midi:{bytes:new Uint8Array(b),name:f.name}})});return}
  if(/\.(vrproj|json|txt)$/i.test(f.name)){f.text().then(t=>{const p=DESK&&DESK.pathForFile?DESK.pathForFile(f):null;openJSONText(t,p?{path:p,name:f.name}:null,f.name)}).catch(err=>toast('无法打开：'+err.message,'err'))}
- else toast('拖入 .vrproj 打开工程，或拖入 MIDI / JSON 导入乐谱；参考音频拖到左侧声线区，伴奏拖到伴奏轨')});
+ else toast('拖入 .vrproj 打开工程，或拖入 MusicXML / MIDI / JSON 导入乐谱；参考音频拖到左侧声线区，伴奏拖到伴奏轨')});
 // File shortcuts work even while typing in a field, like other Windows editors
 document.addEventListener('keydown',e=>{if(!(e.ctrlKey||e.metaKey)||e.altKey||!$('#overlay').hidden)return;const k=e.key.toLowerCase();
  if(k==='s'){e.preventDefault();e.stopPropagation();saveProject(e.shiftKey)}
@@ -2300,7 +2363,7 @@ const TOUR=[
  {id:'lyrics',t:'.lyricbar',demo:'我们一起唱歌吧',h:'批量歌词',b:`一次给一整句或整首歌填词，按顺序<b>每个音填一个字</b>：<ul><li><b>没选音符</b>：从第一个音开始填</li><li><b>选中一个音</b>：从这个音往后填</li><li><b>选中一段</b>（框选，或点上方的乐句条）：只填这一段</li><li>连音（“–”）和休止不占字，标点和空格会被忽略</li><li>字少了，后面的音保持原样；字多了，多出的会被忽略</li></ul><p style="margin:8px 0 0">输入时，卷帘上会用<b>蓝框</b>预览每个字落在哪个音上（现在显示的就是示例）。按 <kbd>Enter</kbd> 或“填入音符”确认。卷帘为空时，每个字会生成一个四分音符。</p>`},
  {id:'ruler',t:'#ruler',h:'标尺和乐句',b:`<ul><li><b>点击或拖动标尺</b>移动播放头，双击从那里开始播放</li><li>下面的色条是<b>乐句</b>：每一句单独提交生成，颜色表示状态（未渲染 / 已渲染 / 已修改）</li><li>右键乐句条可以合并、渲染或删除整句</li></ul>`},
  {id:'transport',t:'.transport',h:'播放',b:`<kbd>Space</kbd> 播放 / 停止。旁边两个开关是“停止后回到起点”和“跟随翻页”。单击时间码（或 <kbd>Ctrl+G</kbd>）可以输入要跳到的小节，比如 <b>5.2</b>。没渲染的乐句用钢琴音播放旋律。`},
- {id:'render',t:'#btnRender',h:'③ 渲染',b:`把未渲染和改动过的乐句交给模型生成（<kbd>Ctrl+R</kbd>），从播放头附近开始。现在是<b>演示服务</b>，人声是模拟的；在右边的 ⚙ 里填上你的 VocalRender 服务地址，就会生成真实歌声。`},
+ {id:'render',t:'#btnRender',h:'③ 渲染',b:`把未渲染和改动过的乐句交给模型生成（<kbd>Ctrl+R</kbd>），按乐句顺序逐句进行。现在是<b>演示服务</b>，人声是模拟的；在右边的 ⚙ 里填上你的 VocalRender 服务地址，就会生成真实歌声。`},
  {id:'insp',t:'#insp',h:'检查器',b:`<ul><li><b>属性</b>：选中音符的歌词、音高、时值；工程的调性和移调</li><li><b>生成</b>：分句方式、表现风格和生成参数</li><li><b>版本</b>：同一句可以生成多个版本对比挑选，播放时按 <kbd>T</kbd> 切换</li><li><b>接口</b>：每一句实际发给服务的请求</li></ul>`},
  {id:'status',t:'#status',h:'状态栏',b:`这里显示乐谱检查结果，比如歌词不是中文、超出音域。点一下可以逐条跳到问题位置。<p style="margin:8px 0 0">按 <kbd>?</kbd> 查看全部快捷键。开始创作吧！</p>`}];
 let tourAt=-1,tourEl=null,tourSavedLyric=null;
@@ -2428,7 +2491,6 @@ $('#inspBody').addEventListener('change',e=>{const t=e.target;const one=selIdx()
  else if(t.id==='scaleHL'){PREFS.scaleHL=t.checked;savePrefs();renderAll()}
  else if(t.id==='scaleSnap'){PREFS.scaleSnap=t.checked;savePrefs();toast(t.checked?'拖动音符时只落在调内音上':'拖动音符按半音移动')}
  else if(t.id==='pgOn'){const p=curPhrase();if(!p)return;if(t.checked){const g=S.gen;S.phraseGen[p.key]={cfg:g.cfg,temp:g.temp,steps:g.steps,seedMode:g.seedMode,seed:g.seed}}else delete S.phraseGen[p.key];renderAll()}
- else if(t.id==='alignAudio'){PREFS.alignAudio=t.checked;savePrefs();toast(t.checked?'播放和导出时人声对齐到乐谱节奏':'播放和导出使用模型原始节奏')}
  else if(t.id==='autoRender'){PREFS.autoRender=t.checked;savePrefs();renderStatus();if(t.checked){toast('停止编辑约 3 秒后自动渲染改动的乐句');scheduleAuto()}}
  else if(t.id==='segRest'){S.gen.segRest=+t.value;renderAll()}
  else if(t.id==='segMax'){S.gen.segMaxSec=+t.value;renderAll()}
