@@ -1706,11 +1706,18 @@ function scoreMidi(){const DIV=480,enc=new TextEncoder(),us=Math.round(6e7/S.bpm
   voc.push(metaEv(t0,5,txt(e.word==='-'?'-':e.word),1),[t0,[0x90,e.pitch,96],2],[t1,[0x80,e.pitch,0],0])});
  return new Uint8Array([0x4d,0x54,0x68,0x64,0,0,0,6,0,1,0,2,(DIV>>8)&255,DIV&255,...smfTrack(cond),...smfTrack(voc)])}
 // One VocalRender label entry per phrase, exactly what each render request carries as "score"
+// the whole song as one token sequence, the same format the importer reads
+function tokenScore(){return S.events.map(e=>`${e.kind==='note'?(e.word==='-'?'·':e.word||'啦'):e.kind==='breath'?'AP':'SP'} <P_${e.kind==='note'?e.pitch:0}> <${NV[e.dur].t}>`).join(' ')+` <BPM_${S.bpm}>`}
 function scoreLabels(){return D.phrases.filter(p=>p.idx.some(i=>S.events[i].kind==='note')).map(p=>({...p.req}))}
 async function exportScore(kind){if(!S.events.some(e=>e.kind==='note'))return toast('还没有音符可以导出');
  const base=(fileRef?fileRef.name.replace(/\.vrproj$/i,''):S.name)||'score';
  try{
   if(kind==='mid'){if(!DESK)return toast('网页版不能保存文件，请在桌面版导出 MIDI','err');const r=await DESK.saveFile({kind:'mid',data:scoreMidi(),defaultName:base+'.mid'});if(r)toast(`已导出 ${r.name}`);return}
+  if(kind==='tok'){const txt=tokenScore();
+   if(DESK){const r=await DESK.saveFile({kind:'txt',data:txt,defaultName:base+'.txt'});if(r)toast(`已导出 ${r.name}`);return}
+   dialog('导出标记序列',`<p class="hint" style="margin:0 0 8px">整首一行：每个字后面是音高 &lt;P_…&gt; 和时值 &lt;NOTE_…&gt;，“·”为连音，末尾 &lt;BPM_…&gt;。可以直接粘贴回“导入乐谱”。</p><textarea id="expJson" readonly spellcheck="false" style="min-height:180px">${esc(txt)}</textarea>`,
+    `<button class="btn line" data-close>关闭</button><button class="btn primary" id="expCopy">复制</button>`,o=>{o.querySelector('#expCopy').onclick=()=>{const ta=o.querySelector('#expJson'),sel=()=>{ta.focus();ta.select();toast('已选中，按 Ctrl+C 复制')};
+     if(navigator.clipboard)navigator.clipboard.writeText(txt).then(()=>toast('已复制'),sel);else sel()}});return}
   const list=scoreLabels(),txt=JSON.stringify(list,null,1);
   if(DESK){const r=await DESK.saveFile({kind:'json',data:txt,defaultName:base+'.json'});if(r)toast(`已导出 ${r.name}（${list.length} 句）`);return}
   dialog('导出 VocalRender JSON',`<p class="hint" style="margin:0 0 8px">每个乐句一条（共 ${list.length} 条），格式与 VocalRender 标注 JSON 相同：word / pitch / note / pitch2word / bpm。网页版不能直接保存文件，请复制后粘贴到文件里。</p><textarea id="expJson" readonly spellcheck="false" style="min-height:220px">${esc(txt)}</textarea>`,
@@ -1840,7 +1847,7 @@ $('#overlay').addEventListener('click',e=>{if(e.target.closest('[data-close]')||
 const MENUS={
  file:[['新建空白工程',DESK?'Ctrl+N':'',()=>newProject()],['打开工程文件…','Ctrl+O',()=>openProject()],...(DESK?[['保存','Ctrl+S',()=>saveProject(false)],['另存为…','Ctrl+Shift+S',()=>saveProject(true)]]:[]),0,
   ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};S.refF0=null;renderAll();toast('已载入示例')}],0,
-  ['导入乐谱（MusicXML / MIDI / JSON）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],['导出乐谱（MIDI）…','',()=>exportScore('mid')],['导出乐谱（VocalRender JSON）…','',()=>exportScore('json')],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
+  ['导入乐谱（MusicXML / MIDI / JSON / 标记序列）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],['导出乐谱（MIDI）…','',()=>exportScore('mid')],['导出乐谱（VocalRender JSON）…','',()=>exportScore('json')],['导出乐谱（标记序列）…','',()=>exportScore('tok')],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
  edit:()=>[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending],0,
   ['移调…','K',()=>transposeDlg()],0,['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.autoRender?'✓ ':'')+'改动后自动渲染','',()=>{PREFS.autoRender=!PREFS.autoRender;savePrefs();renderInspector();renderStatus();if(PREFS.autoRender){toast('停止编辑约 3 秒后自动渲染改动的乐句');scheduleAuto()}else toast('已关闭自动渲染')}],0,[(PREFS.scaleHL?'✓ ':'')+'高亮调内音','',()=>{PREFS.scaleHL=!PREFS.scaleHL;savePrefs();renderAll()}],[(PREFS.scaleSnap?'✓ ':'')+'拖动时吸附调内音','',()=>{PREFS.scaleSnap=!PREFS.scaleSnap;savePrefs();renderAll()}],[(PREFS.segLines?'✓ ':'')+'显示乐句边界线','',()=>{PREFS.segLines=!PREFS.segLines;savePrefs();renderRoll()}],0,[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
  help:[['新手引导','',()=>startTour(0)],['批量歌词怎么用','',()=>startTour(TOUR.findIndex(t=>t.id==='lyrics'))],0,['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
@@ -2114,12 +2121,12 @@ function musicXmlInfo(text,fname){
 }
 function importDlg(prefill){
  const pm=prefill&&prefill.midi?prefill.midi:null;if(pm)prefill=null;const pmXml=pm&&!isMidiName(pm.name);
- dialog('导入乐谱',`<div class="segs" style="margin-bottom:14px"><button data-it="midi" class="${pm&&!pmXml?'on':''}">MIDI</button><button data-it="xml" class="${pmXml?'on':''}">MusicXML</button><button data-it="json" class="${pm?'':'on'}">JSON</button><button data-it="abc">ABC 记谱</button></div>
+ dialog('导入乐谱',`<div class="segs" style="margin-bottom:14px"><button data-it="midi" class="${pm&&!pmXml?'on':''}">MIDI</button><button data-it="xml" class="${pmXml?'on':''}">MusicXML</button><button data-it="json" class="${pm?'':'on'}">JSON / 标记</button><button data-it="abc">ABC 记谱</button></div>
  <div id="impBody"></div>`,`<button class="btn line" data-close>取消</button><button class="btn primary" id="impGo">导入</button>`,o=>{
   let type=pm?(pmXml?'xml':'midi'):'json',parsed=null,t=null;const body=o.querySelector('#impBody'),go=o.querySelector('#impGo');
   const st={sel:null,bpm:90,auto:90,grid:1,ref:true,part:0,legato:true};
   const draw=()=>{parsed=null;go.textContent='导入';go.disabled=false;body.innerHTML=type==='midi'?`<label class="drop" for="impMidi" id="impMidiDrop">选择 .mid / .midi 文件<br><span class="hint">也可以直接把 MIDI 文件拖进窗口</span></label><input type="file" id="impMidi" accept=".mid,.midi,.kar" hidden><div id="impPrev" style="margin-top:12px"></div>`
-   :type==='json'?`<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="hint">支持 VocalRender 标注（word / pitch / note / pitch2word / bpm），以及带时长的歌唱转写（text / note_pitch / note_type / duration 秒，可带 time 和 f0）。</span><label class="btn line" for="impJsonFile" style="flex:none">选择文件…</label><input type="file" id="impJsonFile" accept=".json,.txt" hidden></div><textarea id="impText" spellcheck="false" placeholder='粘贴 JSON，或点“选择文件…”'></textarea><div id="impPrev" style="margin-top:12px"></div>`
+   :type==='json'?`<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="hint">支持 VocalRender 标注 JSON（word / pitch / note / pitch2word / bpm）、标记序列（<span class="mono">阳 &lt;P_57&gt; &lt;NOTE_8&gt; … &lt;BPM_120&gt;</span>，“·”为连音），以及带时长的歌唱转写（text / note_pitch / duration 秒，可带 time 和 f0）。</span><label class="btn line" for="impJsonFile" style="flex:none">选择文件…</label><input type="file" id="impJsonFile" accept=".json,.txt" hidden></div><textarea id="impText" spellcheck="false" placeholder='粘贴 JSON 或标记序列，或点“选择文件…”'></textarea><div id="impPrev" style="margin-top:12px"></div>`
    :type==='xml'?`<label class="drop" for="impXml" id="impMidiDrop">选择 .musicxml / .xml / .mxl 文件<br><span class="hint">MuseScore、Sibelius、Finale、Dorico 等打谱软件导出的 MusicXML；也可以直接把文件拖进窗口</span></label><input type="file" id="impXml" accept=".musicxml,.xml,.mxl" hidden>
     <details class="imp-paste" style="margin-top:8px"><summary class="hint" style="cursor:pointer">或者粘贴 MusicXML 文本</summary><textarea id="impXmlText" spellcheck="false" placeholder="<?xml version=&quot;1.0&quot;?>&#10;<score-partwise …>" style="margin-top:6px;min-height:90px"></textarea></details><div id="impPrev" style="margin-top:12px"></div>`
    :`<textarea id="impText" spellcheck="false" placeholder="X:1&#10;L:1/8&#10;Q:1/4=90&#10;K:C&#10;E G A2 G E D2 |&#10;w: 晚 风 吹 过 旧 街"></textarea><p class="hint">由服务端 <span class="mono">POST /score/import</span> 解析，小写 w: 行作为对齐歌词，下划线 _ 表示连音。</p>`;
@@ -2160,6 +2167,10 @@ function importDlg(prefill){
    stats()}
   function analyse(){const txt=o.querySelector('#impText').value.trim();parsed=null;go.textContent='导入';if(!txt){prev().innerHTML='';return}
    if(type==='json'&&/^</.test(txt)&&isXmlText(txt)){type='xml';o.querySelectorAll('[data-it]').forEach(x=>x.classList.toggle('on',x.dataset.it==='xml'));prefill={xml:txt};draw();return}
+   if(!/^[\[{]/.test(txt)&&isTokenScore(txt)){try{const r=parseTokenScore(txt),x={bpm:r.bpm||S.bpm},ev=r.ev;parsed={kind:'label',x,ev};
+     const notes=ev.filter(e=>e.kind==='note'),ps=notes.map(e=>e.pitch),words=notes.filter(e=>e.word!=='-').length;
+     prev().innerHTML=`<div class="card imp-stats">识别为 <b>VocalRender 标记序列</b> · ${ev.length} 个事件（${words} 个字，${r.mel} 个连音，${ev.length-notes.length} 个休止/换气）· ${r.bpm?r.bpm+' BPM':'没写速度，沿用 '+S.bpm+' BPM'} · 音域 ${pname(Math.min(...ps))}–${pname(Math.max(...ps))}${r.bpmVaries?'<br><span style="color:var(--warn)">序列里有多个不同的 BPM，按第一个导入。</span>':''}</div>`}
+    catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">${esc(e.message)}</p>`}return}
    let d;try{d=JSON.parse(txt)}catch(e){prev().innerHTML=`<p class="hint" style="color:var(--err)">不是有效的 JSON：${esc(e.message)}</p>`;return}
    try{
     if(isTranscript(d)){const segs=parseTranscript(d);st.sel=new Set(segs.map((_,i)=>i));st.auto=st.bpm=estimateBpm(segs);parsed={kind:'transcript',segs};showTranscript()}
@@ -2218,9 +2229,35 @@ function importDlg(prefill){
    toast(`已导入 ${q.notes} 个音符 · ${S.bpm} BPM${S.refF0?' · 灰线是原唱音高':''}，可用 Ctrl+Z 撤销${rangeHint()}`)};
  })}
 // Files opened or dropped: a project, or a score to import
-function openJSONText(text,ref,fname){let d;try{d=JSON.parse(text)}catch(e){throw new Error('文件不是有效的 JSON')}
+function openJSONText(text,ref,fname){if(!/^\s*[\[{]/.test(text)&&isTokenScore(text)){importDlg(text);return}
+ let d;try{d=JSON.parse(text)}catch(e){throw new Error('文件不是有效的 JSON，也不是 VocalRender 标记序列')}
  if(isTranscript(d)||isLabel(d)){importDlg(text);return}
  loadProject(d,ref);toast('已打开 '+fname)}
+// Token-sequence score: `阳 <P_57> <NOTE_8> 光 <P_62> <NOTE_8> … SP <P_0> <NOTE_8> <BPM_120>`
+// A word is followed by its pitch and note value; `·` / `-` / `~` (or a pitch+value with no word before it) continues the
+// previous word on a new pitch (melisma); SP = rest, AP = breath; <BPM_n> sets the tempo.
+const isTokenScore=t=>/<P_\d+>/.test(t)&&/<NOTE_[A-Z0-9_]+>/.test(t);
+function parseTokenScore(text){
+ const idx=Object.fromEntries(NV.map((n,k)=>[n.t,k])),ev=[],bpms=[],toks=text.split(/\s+|(?=<)|(?<=>)/).map(x=>x.trim()).filter(Boolean);
+ let word=null,pit=null,val=null,hadNote=false,mel=0,n=0;
+ const flush=at=>{if(pit==null&&val==null)return;
+  if(pit==null||val==null)throw new Error(`第 ${at} 个标记附近：${pit==null?'缺少音高 <P_…>':'缺少时值 <NOTE_…>'}`);
+  let w=word;if(w==null){if(!hadNote)throw new Error('开头缺少歌词');w='-'}
+  if(/^[·\-~～–—]$/.test(w))w='-';
+  if(w==='-'){const prev=ev[ev.length-1];if(!prev||prev.kind!=='note')throw new Error(`第 ${at} 个标记附近：连音“${word||'·'}”前面没有字`);mel++}
+  const k=val;if(w==='SP'||w==='AP'||(pit===0&&w!=='-'))ev.push({id:uid(),kind:w==='AP'?'breath':'rest',word:w==='AP'?'AP':'SP',pitch:0,dur:k});
+  else ev.push({id:uid(),kind:'note',word:w,pitch:pit,dur:k});
+  hadNote=true;word=null;pit=null;val=null};
+ toks.forEach((t,i)=>{n=i+1;let m;
+  if((m=t.match(/^<P_(\d+)>$/))){if(pit!=null)flush(n);pit=+m[1];if(pit>127)throw new Error(`第 ${n} 个标记：音高 ${t} 超出范围`)}
+  else if((m=t.match(/^<(NOTE_[A-Z0-9_]+)>$/))){if(val!=null)flush(n);if(!(m[1] in idx))throw new Error(`第 ${n} 个标记：不支持的时值 ${t}`);val=idx[m[1]]}
+  else if((m=t.match(/^<BPM_(\d+(?:\.\d+)?)>$/))){flush(n);bpms.push(+m[1])}
+  else if(/^<.*>$/.test(t)){/* other control tokens are ignored */}
+  else{flush(n);word=t}
+  if(pit!=null&&val!=null)flush(n)});
+ flush(n);if(word!=null&&word!=='SP'&&word!=='AP')throw new Error(`最后的“${word}”没有音高和时值`);
+ if(!ev.length)throw new Error('没有找到音符');
+ return{ev,bpm:bpms.length?Math.round(bpms[0]):null,bpmVaries:new Set(bpms).size>1,mel}}
 function fromLabel(d){
  ['word','pitch','note','pitch2word'].forEach(k=>{if(!Array.isArray(d[k]))throw new Error(`缺少 ${k} 字段`)});
  if(d.pitch.length!==d.note.length||d.pitch.length!==d.pitch2word.length)throw new Error('pitch、note、pitch2word 长度不一致');

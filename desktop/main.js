@@ -29,7 +29,7 @@ function titleBarOverlay() {
   return { color: '#00000000', symbolColor: nativeTheme.shouldUseDarkColors ? '#ffffff' : '#1b1b1b', height: TITLEBAR_HEIGHT };
 }
 function projectArg(argv) {
-  return argv.slice(1).find(a => !a.startsWith('-') && /\.(vrproj|json|mid|midi|kar|musicxml|mxl|xml)$/i.test(a)) || null;
+  return argv.slice(1).find(a => !a.startsWith('-') && /\.(vrproj|json|mid|midi|kar|musicxml|mxl|xml|txt)$/i.test(a)) || null;
 }
 const safeName = n => String(n || '未命名').replace(/[\\/:*?"<>|]/g, '_').slice(0, 120);
 
@@ -130,6 +130,7 @@ ipcMain.handle('vr:save', async (_e, o) => {
     wav: { title: '导出音频', dir: 'music', filters: [{ name: 'WAV 音频', extensions: ['wav'] }] },
     mid: { title: '导出 MIDI', dir: 'documents', filters: [{ name: 'MIDI', extensions: ['mid'] }] },
     json: { title: '导出 VocalRender JSON', dir: 'documents', filters: [{ name: 'JSON', extensions: ['json'] }] },
+    txt: { title: '导出标记序列', dir: 'documents', filters: [{ name: '文本', extensions: ['txt'] }] },
     project: { title: '保存工程', dir: 'documents', filters: [{ name: 'VocalRender 工程', extensions: ['vrproj'] }] },
   };
   const kind = KINDS[o.kind] || KINDS.project;
