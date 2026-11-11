@@ -188,7 +188,8 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .pband .pd{width:6px;height:6px;border-radius:50%;background:var(--fg-3);flex:none}
 .pband.done{border-color:color-mix(in srgb,var(--ok) 45%,transparent)}.pband.done .pd{background:var(--ok)}
 .pband.stale{border-color:color-mix(in srgb,var(--warn) 55%,transparent)}.pband.stale .pd{background:var(--warn)}
-.pband.error{border-color:color-mix(in srgb,var(--err) 55%,transparent)}.pband.error .pd{background:var(--err)}
+.pband.error,.pband.failed{border-color:color-mix(in srgb,var(--err) 55%,transparent)}.pband.error .pd,.pband.failed .pd{background:var(--err)}
+.pband.lost{border-color:color-mix(in srgb,var(--warn) 55%,transparent)}.pband.lost .pd{background:var(--warn)}
 .pband.rendering .pd,.pband.queued .pd{background:var(--accent);animation:pulse 1s infinite}
 .pband.cur{box-shadow:0 0 0 1.5px var(--accent)}
 .pband .pf{position:absolute;inset:auto 0 0 0;height:2px;background:var(--accent);transform-origin:left}
@@ -245,7 +246,13 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .lseg.done{background:var(--accent-soft)}
 .lseg.stale{background:var(--warn-soft);color:var(--warn)}
 .lseg.stale canvas{opacity:.35}
-.lseg.error{border:1px dashed var(--err);color:var(--err)}
+.lseg.error,.lseg.failed{border:1px dashed var(--err);color:var(--err)}
+.lseg.lost{border:1px dashed var(--warn);color:var(--warn)}
+.lseg .lretry{position:relative;z-index:1;margin-left:5px;height:18px;padding:0 7px;border-radius:9px;border:1px solid var(--err);background:var(--panel);color:var(--err);font-size:10.5px;cursor:pointer}
+.lseg .lretry:hover{background:var(--err-soft)}
+/* waveform of a take's real audio: placed where the audio actually starts and ends, which can reach past the written phrase */
+.lwave{position:absolute;top:5px;bottom:5px;height:calc(100% - 10px);pointer-events:none}
+.lwave.dim{opacity:.35}
 .lseg .lbl{position:relative;z-index:1;background:var(--panel);border-radius:3px;padding:0 4px}
 .lseg .prog{position:absolute;left:0;top:0;bottom:0;background:var(--accent-soft);border-right:2px solid var(--accent)}
 .bk-seg{position:absolute;top:5px;bottom:5px;left:0;border-radius:4px;background:color-mix(in srgb,var(--wave-bg) 16%,transparent);overflow:hidden}
@@ -301,7 +308,7 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .chip{height:26px;padding:0 9px;border-radius:13px;border:1px solid var(--line-2);background:var(--raised);font-size:11.5px;display:inline-flex;align-items:center;gap:5px}
 .chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
 .chip .pd{width:6px;height:6px;border-radius:50%;background:var(--fg-3)}
-.chip .pd.done{background:var(--ok)}.chip .pd.stale{background:var(--warn)}.chip .pd.error{background:var(--err)}.chip .pd.rendering,.chip .pd.queued{background:var(--accent)}
+.chip .pd.done{background:var(--ok)}.chip .pd.stale{background:var(--warn)}.chip .pd.error,.chip .pd.failed{background:var(--err)}.chip .pd.lost{background:var(--warn)}.chip .pd.rendering,.chip .pd.queued{background:var(--accent)}
 .take{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:var(--raised)}
 .take+.take{margin-top:6px}
 .take.act{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
@@ -721,12 +728,19 @@ const S={
  service:{mode:'demo',base:'https://your-server.example.com/v1',key:'',conc:1},
  phraseGen:{}, key:null,
  quickHidden:false, showF0:true};
+// service address, mode and concurrency are remembered on this machine; the access token is not
+{const sv=store.get('vrstudio.service');if(sv&&typeof sv==='object'){if(sv.mode==='demo'||sv.mode==='remote')S.service.mode=sv.mode;if(typeof sv.base==='string'&&sv.base.trim())S.service.base=sv.base.trim();if(+sv.conc)S.service.conc=Math.max(1,Math.min(4,Math.round(+sv.conc)))}}
+const saveService=()=>store.set('vrstudio.service',{mode:S.service.mode,base:S.service.base,conc:S.service.conc});
 const saved=store.get('vrstudio.project');
 if(saved&&Array.isArray(saved.events)&&saved.events.length){
  Object.assign(S,{name:saved.name||S.name,bpm:saved.bpm||90,bpb:saved.bpb||4,events:saved.events,voice:(VOICES.some(v=>v.id===saved.voice)||(saved.customVoices||[]).some(v=>v.id===saved.voice))?saved.voice:'Alto-1',ckpt:saved.ckpt||S.ckpt});
  if(Array.isArray(saved.customVoices))restoreVoices(saved.customVoices);
  if(saved.gen) Object.assign(S.gen,saved.gen);
- if(saved.renders) S.renders=saved.renders;
+ if(saved.renders&&typeof saved.renders==='object') S.renders=saved.renders;
+ // earlier versions put made-up "rendered" example takes on the sample's first two phrases: drop those
+ Object.entries(S.renders).forEach(([k,r])=>{if(!r||!Array.isArray(r.takes)){delete S.renders[k];return}
+  r.takes=r.takes.filter(t=>!(t.id==='t'+t.n+k&&!t.svc&&[73021,511984,90311].includes(t.seed)));r.job=null;
+  if(!r.takes.some(t=>t.id===r.active))r.active=r.takes.length?r.takes[r.takes.length-1].id:null});
  if(saved.refF0) S.refF0=saved.refF0;
  if(Array.isArray(saved.refShift)) S.refShift=saved.refShift;
  if(saved.phraseGen&&typeof saved.phraseGen==='object') S.phraseGen=saved.phraseGen;
@@ -749,11 +763,13 @@ function voiceObj(){return VOICES.find(v=>v.id===S.voice)||S.customVoices.find(v
 function derive(){
  const starts=[];let t=0;S.events.forEach(e=>{starts.push(t);t+=beats(e)});
  const{phrases,pOf,seg}=segment(starts);
- phrases.forEach((p,n)=>{p.n=n+1;p.text=p.idx.map(i=>S.events[i]).filter(e=>e.kind==='note'&&e.word!=='-').map(e=>e.word).join('');p.req=buildScore(p);p.hash=phraseHash(p)});
+ phrases.forEach((p,n)=>{p.n=n+1;p.text=p.idx.map(i=>S.events[i]).filter(e=>e.kind==='note'&&e.word!=='-').map(e=>e.word).join('');p.req=buildScore(p);p.hashes=phraseHashes(p);p.hash=p.hashes[S.service.mode==='demo'?0:1];
+  // takes saved before the service was recorded: note which service made them; a real service's take of the current score keeps counting as rendered
+  const r=S.renders[p.key];if(r&&r.takes)r.takes.forEach(t=>{if(t.svc)return;t.svc=takeSvc(t);if(t.svc==='remote'&&t.hash===p.hashes[0])t.hash=p.hashes[1]})});
  D={starts,total:t,phrases,pOf,seg,byKey:Object.fromEntries(phrases.map(p=>[p.key,p]))};
  D.key=S.key?{...S.key,sure:true,manual:true}:detectKey(noteIdx(null));
  validate();
- phrases.forEach(p=>p.status=phraseStatus(p));
+ phrases.forEach(p=>{p.status=phraseStatus(p);const t=activeTake(p.key);p.svcChanged=p.status==='stale'&&!!t&&sameScore(t,p)});
 }
 // Phrasing: which stretches of the score are rendered as one request.
 // 1) cut the score into chunks at rests and at manual "split here" marks (chunks too big for one request are cut at word starts);
@@ -816,17 +832,63 @@ function slug(){const s=S.name.trim();return /^[\w-]+$/.test(s)?s:'proj_'+hashSt
 function genOf(p){const o=p&&S.phraseGen&&S.phraseGen[p.key];return o?{...S.gen,...o}:S.gen}
 function genParams(p){const g=genOf(p);return{cfg_value:+g.cfg,inference_timesteps:+g.steps,temperature:+g.temp,fsq_temperature:+g.fsq,max_len:+g.maxLen,prompt_max_frames:+g.promptFrames,lyrics_only:!!g.lyricsOnly}}
 function promptAudio(){const v=voiceObj();if(v.kind==='preset')return{preset:v.id};const base=S.service.base.replace(/\/$/,'');return{upload_id:(v.uploads&&v.uploads[base])||'<渲染时先 POST /voices 上传，填入返回的 upload_id>',duration:+v.dur.toFixed(2)}}
-function phraseHash(p){const r={...p.req};delete r.item_name;return hashStr(JSON.stringify([r,S.voice,S.ckpt,genParams(p)]))}
+// What a take was rendered from: score, voice, model, settings and the kind of service (the demo's simulated voice is not
+// the real service's singing, so takes of one do not count as rendered for the other). [hash in demo mode, hash for a real service]
+function phraseHashes(p){const r={...p.req};delete r.item_name;const a=[r,S.voice,S.ckpt,genParams(p)];return[hashStr(JSON.stringify(a)),hashStr(JSON.stringify([...a,'remote']))]}
+function phraseHash(p){return phraseHashes(p)[S.service.mode==='demo'?0:1]}
+// which kind of service made a take ('demo' | 'remote'); takes saved before this was recorded: only real services return a pitch curve
+const takeSvc=t=>t.svc||(t.f0?'remote':'demo');
+const sameScore=(t,p)=>p.hashes.includes(t.hash);
+const allTakes=()=>Object.values(S.renders).flatMap(r=>r.takes);
+// a take that can be heard: simulated ones always can (built-in synth voice), service ones need their audio
+const takeUsable=t=>takeSvc(t)==='demo'||!!t.buffer||audioState.get(t.id)==='loading';
 function rec(key){return S.renders[key]||(S.renders[key]={takes:[],active:null,job:null})}
 function activeTake(key){const r=S.renders[key];if(!r||!r.active)return null;return r.takes.find(t=>t.id===r.active)||null}
 function phraseStatus(p){
  const r=S.renders[p.key];
  if(r&&r.job)return r.job.state;
  if(D.errKeys.has(p.key))return 'error';
- const t=activeTake(p.key);if(!t)return 'none';
- return t.hash===p.hash?'done':'stale';
+ const t=activeTake(p.key),failed=!!(r&&r.fail&&r.fail.hash===p.hash);
+ if(!t)return failed?'failed':'none';
+ if(t.hash!==p.hash)return failed?'failed':'stale';
+ if(!takeUsable(t))return failed?'failed':'lost';   // rendered by a service, but its audio is gone
+ return 'done';
 }
-const STATUS_TXT={none:'未渲染',done:'已渲染',stale:'已修改',error:'有错误',queued:'排队中',rendering:'渲染中'};
+const STATUS_TXT={none:'未渲染',done:'已渲染',stale:'已修改',error:'有错误',queued:'排队中',rendering:'渲染中',failed:'渲染失败',lost:'音频已丢失'};
+const stText=p=>p.status==='stale'&&p.svcChanged?'换了渲染服务':STATUS_TXT[p.status];
+const stTag=st=>st==='done'?'ok':st==='stale'||st==='lost'?'warn':st==='error'||st==='failed'?'err':st==='none'?'':'acc';
+
+/* ================= rendered audio store ================= */
+// The WAV bytes of every service-rendered take are kept in IndexedDB (key = take id), so the audio is still there after a
+// reload or restart; the desktop app also writes them into the saved project file. Without IndexedDB they stay in memory.
+const audioMem=new Map(),audioState=new Map();   // take id -> bytes (fallback store) / 'loading' | 'missing'
+let audioDB=null;
+function audioOpen(){return audioDB||(audioDB=new Promise(res=>{try{const rq=indexedDB.open('vrstudio',1);rq.onupgradeneeded=()=>rq.result.createObjectStore('audio');rq.onsuccess=()=>res(rq.result);rq.onerror=rq.onblocked=()=>res(null)}catch(e){res(null)}}))}
+function idb(mode,fn){return audioOpen().then(db=>{if(!db)throw new Error('no IndexedDB');return new Promise((res,rej)=>{let out;const tx=db.transaction('audio',mode),rq=fn(tx.objectStore('audio'));if(rq)rq.onsuccess=()=>{out=rq.result};tx.oncomplete=()=>res(out);tx.onerror=tx.onabort=()=>rej(tx.error)})})}
+async function audioPut(id,bytes){try{await idb('readwrite',st=>st.put(bytes,id));audioMem.delete(id)}catch(e){audioMem.set(id,bytes)}}
+async function audioGet(id){if(audioMem.has(id))return audioMem.get(id);try{return await idb('readonly',st=>st.get(id))||null}catch(e){return null}}
+async function audioDrop(ids){ids.forEach(id=>{audioMem.delete(id);audioState.delete(id)});try{await idb('readwrite',st=>{ids.forEach(id=>st.delete(id))})}catch(e){}}
+// forget audio that no take of the current project refers to any more
+async function audioGC(){const keep=new Set(allTakes().map(t=>t.id));[...audioMem.keys()].forEach(k=>{if(!keep.has(k))audioMem.delete(k)});
+ try{const keys=await idb('readonly',st=>st.getAllKeys()),dead=keys.filter(k=>!keep.has(k));if(dead.length)await idb('readwrite',st=>{dead.forEach(k=>st.delete(k))})}catch(e){}}
+const decodeBytes=bytes=>new OfflineAudioContext(1,1,48000).decodeAudioData(bytes.slice(0));
+// Give service-rendered takes their audio back: from the opened project file when it carries it (base64 per take id), else from IndexedDB.
+// A take whose audio cannot be found is marked missing; its phrase then shows as "音频已丢失" instead of "已渲染".
+let hydrateRun=0;
+async function hydrateAudio(fileAudio){
+ const run=++hydrateRun,list=allTakes().filter(t=>takeSvc(t)==='remote'&&!t.buffer);
+ list.forEach(t=>audioState.set(t.id,'loading'));
+ await Promise.all(list.map(async t=>{try{
+   let bytes=fileAudio&&typeof fileAudio[t.id]==='string'?b64ToBytes(fileAudio[t.id]).buffer:null;
+   if(bytes)audioPut(t.id,bytes.slice(0));else bytes=await audioGet(t.id);
+   if(!bytes)throw new Error('missing');
+   t.buffer=await decodeBytes(bytes);t.dur=+t.buffer.duration.toFixed(3);audioState.delete(t.id)}
+  catch(e){audioState.set(t.id,'missing')}}));
+ if(run!==hydrateRun)return;
+ if(list.length){renderAll();const lost=D.phrases.filter(p=>p.status==='lost').length;
+  if(lost)toast(`${lost} 个乐句的渲染音频找不到了，已标为“音频已丢失”，重新渲染后恢复`)}
+ audioGC();
+}
 
 /* ================= validation ================= */
 function validate(){
@@ -904,32 +966,56 @@ function renderRuler(){
  S.events.forEach((e,i)=>{if(e.seg==='break'&&e.kind!=='rest')h+=`<div class="segmark" style="left:${D.starts[i]*S.ppb}px" title="手动断句：从这里开始新的一句"></div>`});
  D.phrases.forEach(p=>{const r=S.renders[p.key];const prog=r&&r.job&&r.job.state==='rendering'?r.job.progress:0;
   const u=Math.max(p.req.word.length/LIMIT_UNITS,p.req.pitch.length/LIMIT_EVENTS),ovr=!!S.phraseGen[p.key],tk=r&&r.takes.length?r.takes.findIndex(t=>t.id===r.active)+1:0;
-  h+=`<div class="pband ${p.status}${S.curPhrase===p.key?' cur':''}" data-key="${p.key}" style="left:${p.start*S.ppb+1}px;width:${(p.end-p.start)*S.ppb-2}px" title="乐句 ${p.n} · ${STATUS_TXT[p.status]} · ${((p.end-p.start)*60/S.bpm).toFixed(1)} 秒 · ${p.req.word.length}/${LIMIT_UNITS} 字 · ${p.req.pitch.length}/${LIMIT_EVENTS} 事件${tk?` · 版本 ${tk}/${r.takes.length}`:''}${ovr?' · 本句单独设置了生成参数':''}"><span class="pd"></span>P${p.n}${ovr?' ⚙':''} · ${STATUS_TXT[p.status]}${prog?` ${Math.round(prog*100)}%`:''}<span class="pu${u>.85?' hi':''}" style="width:${Math.min(100,u*100).toFixed(1)}%"></span>${prog?`<span class="pf" style="transform:scaleX(${prog})"></span>`:''}</div>`});
+  h+=`<div class="pband ${p.status}${S.curPhrase===p.key?' cur':''}" data-key="${p.key}" style="left:${p.start*S.ppb+1}px;width:${(p.end-p.start)*S.ppb-2}px" title="乐句 ${p.n} · ${stText(p)} · ${((p.end-p.start)*60/S.bpm).toFixed(1)} 秒 · ${p.req.word.length}/${LIMIT_UNITS} 字 · ${p.req.pitch.length}/${LIMIT_EVENTS} 事件${tk?` · 版本 ${tk}/${r.takes.length}`:''}${ovr?' · 本句单独设置了生成参数':''}"><span class="pd"></span>P${p.n}${ovr?' ⚙':''} · ${stText(p)}${prog?` ${Math.round(prog*100)}%`:''}<span class="pu${u>.85?' hi':''}" style="width:${Math.min(100,u*100).toFixed(1)}%"></span>${prog?`<span class="pf" style="transform:scaleX(${prog})"></span>`:''}</div>`});
  if(audio.playing&&PREFS.returnOnStop&&audio.startBeat!=null)h+=`<div class="startmark" style="left:${audio.startBeat*S.ppb}px" title="停止后回到这里"></div>`;
  if(ghostBeat!=null)h+=`<div class="ghost" id="rGhost" style="left:${ghostBeat*S.ppb}px"><span>${posStr(ghostBeat)}</span></div>`;
  h+=`<div class="phead" id="phRuler" style="left:${S.playhead*S.ppb}px"></div>`;
  rulerIn.style.width=W+'px';rulerIn.innerHTML=h;
 }
 function renderLanes(){
- const W=contentBeats()*S.ppb;let h='<div class="lane" id="laneV">';
+ const W=contentBeats()*S.ppb,spb=60/S.bpm;let h='<div class="lane" id="laneV">',waves='';
  D.phrases.forEach(p=>{const x=p.start*S.ppb,w=(p.end-p.start)*S.ppb;const r=S.renders[p.key];
-  let inner='';
-  if(p.status==='rendering'||p.status==='queued'){inner=`<span class="prog" style="width:${(r.job.progress||0)*100}%"></span><span class="lbl">${p.status==='queued'?'排队中':'渲染中 '+Math.round((r.job.progress||0)*100)+'%'}</span>`}
-  else if(p.status==='done')inner=`<canvas data-wave="${p.key}"></canvas>`;
-  else if(p.status==='stale')inner=`<canvas data-wave="${p.key}"></canvas><span class="lbl">已修改 · 需重新渲染</span>`;
-  else if(p.status==='error')inner=`<span class="lbl">有错误，无法渲染</span>`;
-  else inner=`<span>未渲染</span>`;
-  h+=`<div class="lseg ${p.status==='queued'?'rendering':p.status}" data-key="${p.key}" style="left:${x+1}px;width:${w-2}px">${inner}</div>`});
+  let inner='';const st=p.status,t=activeTake(p.key);
+  const fail=()=>`<span class="lbl" title="${esc(r.fail.msg)}">渲染失败</span><button class="lretry" data-retry="${p.key}" title="${esc(r.fail.msg)}">重试</button>`;
+  if(st==='rendering'||st==='queued'){inner=`<span class="prog" style="width:${(r.job.progress||0)*100}%"></span><span class="lbl">${st==='queued'?'排队中':'渲染中 '+Math.round((r.job.progress||0)*100)+'%'}</span>`}
+  else if(st==='error')inner=`<span class="lbl">有错误，无法渲染</span>`;
+  else if(!t)inner=st==='failed'?fail():`<span>未渲染</span>`;
+  else{
+   // real audio: its waveform, drawn over the time the audio really occupies; simulated takes: a sketch made from the score, labelled as such
+   if(t.buffer){const lx=(p.start-takeLead(t,p)/spb)*S.ppb;waves+=`<canvas class="lwave${st==='done'?'':' dim'}" data-wave="${p.key}" style="left:${lx.toFixed(1)}px;width:${Math.max(1,t.buffer.duration/spb*S.ppb).toFixed(1)}px"></canvas>`}
+   else if(takeSvc(t)==='demo')inner=`<canvas data-wave="${p.key}"></canvas>`;
+   if(st==='done')inner+=t.buffer?'':takeSvc(t)==='demo'?`<span class="lbl" title="演示模式的模拟结果：这段波形和试听的声音由乐谱生成，不是真实的演唱。连接渲染服务后需要重新渲染">模拟</span>`:`<span class="lbl">载入音频…</span>`;
+   else if(st==='stale')inner+=`<span class="lbl">${p.svcChanged?'换了渲染服务':'已修改'} · 需重新渲染</span>`;
+   else if(st==='lost')inner+=`<span class="lbl" title="这一句渲染过，但音频没有保存下来">音频已丢失 · 需重新渲染</span>`;
+   else if(st==='failed')inner+=fail();
+  }
+  h+=`<div class="lseg ${st==='queued'?'rendering':st}" data-key="${p.key}" style="left:${x+1}px;width:${w-2}px">${inner}</div>`});
+ h+=waves;
  h+=`</div><div class="lane" id="laneB">`;
  if(S.backing){const w=S.backing.buffer.duration/60*S.bpm*S.ppb;h+=`<div class="bk-seg" style="width:${w}px"><canvas id="bkCanvas"></canvas></div>`}
  else h+=`<span class="bk-empty">把伴奏音频拖到这里，或在左侧“伴奏”轨点导入</span>`;
  h+=`</div><div class="phead" id="phLanes" style="left:${S.playhead*S.ppb}px"></div>`;
  lanesIn.style.width=W+'px';lanesIn.style.height='92px';lanesIn.innerHTML=h;
- $$('#lanesIn canvas[data-wave]').forEach(c=>{const t=activeTake(c.dataset.wave);if(t)drawTakeWave(c,D.byKey[c.dataset.wave],t,c.closest('.lseg').classList.contains('stale'))});
+ $$('#lanesIn canvas[data-wave]').forEach(c=>{const t=activeTake(c.dataset.wave);if(!t)return;
+  if(t.buffer)drawWave(c,t.buffer,cssVar('--wave'));else drawTakeWave(c,D.byKey[c.dataset.wave],t,c.closest('.lseg').classList.contains('stale'))});
  if(S.backing)drawBuffer($('#bkCanvas'),S.backing.buffer,cssVar('--wave-bg'));
 }
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
-function sizeCanvas(c){const r=c.getBoundingClientRect();const dpr=Math.min(2,window.devicePixelRatio||1);c.width=Math.max(1,Math.round(r.width*dpr));c.height=Math.max(1,Math.round(r.height*dpr));const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);return{g,w:r.width,h:r.height}}
+function sizeCanvas(c){const r=c.getBoundingClientRect();const dpr=Math.min(2,window.devicePixelRatio||1),dx=Math.min(dpr,16000/Math.max(1,r.width));   // a canvas cannot be arbitrarily wide
+ c.width=Math.max(1,Math.round(r.width*dx));c.height=Math.max(1,Math.round(r.height*dpr));const g=c.getContext('2d');g.setTransform(dx,0,0,dpr,0,0);return{g,w:r.width,h:r.height}}
+// loudness outline of an audio buffer (peak per 5 ms), computed once per buffer
+const peakCache=new WeakMap();
+function peaksOf(buf){let pk=peakCache.get(buf);if(pk)return pk;
+ const d=buf.getChannelData(0),hop=Math.max(1,Math.round(buf.sampleRate/200)),n=Math.ceil(d.length/hop);pk=new Float32Array(n);
+ for(let i=0;i<n;i++){let m=0;const e=Math.min(d.length,(i+1)*hop);for(let k=i*hop;k<e;k+=2){const a=d[k]<0?-d[k]:d[k];if(a>m)m=a}pk[i]=m}
+ peakCache.set(buf,pk);return pk}
+// the real waveform of rendered audio; the canvas spans the whole buffer, silence shows as a thin line
+function drawWave(c,buf,color){
+ if(!c)return;const{g,w,h}=sizeCanvas(c);g.clearRect(0,0,w,h);g.fillStyle=color;const pk=peaksOf(buf),n=pk.length,mid=h/2;
+ for(let x=0;x<w;x++){const a=Math.floor(x/w*n),b=Math.max(a+1,Math.floor((x+1)/w*n));let m=0;for(let k=a;k<b&&k<n;k++)if(pk[k]>m)m=pk[k];
+  const bh=Math.max(.5,Math.min(1,m)*(mid-1));g.fillRect(x,mid-bh,1,bh*2)}
+}
+// simulated (demo) takes have no audio: sketch a waveform from the score so the lane is not empty
 function drawTakeWave(c,p,take,dim){
  if(!p)return;const{g,w,h}=sizeCanvas(c);g.clearRect(0,0,w,h);g.fillStyle=cssVar(dim?'--wave-dim':'--wave');
  const rnd=mulberry(take.seed);const span=p.end-p.start;const mid=h/2;
@@ -1013,7 +1099,7 @@ function alignToScore(notes,spb,vals,hop,trail){
 // the lyrics even when the singing timing differs from the score, or SP/AP were inserted after rendering.
 function f0SVG(W,H){
  if(!S.showF0)return '';let out='';const at=new Map(S.events.map((e,i)=>[e.id,i]));
- D.phrases.forEach(p=>{if(p.status!=='done'&&p.status!=='stale')return;const t=activeTake(p.key);if(!t)return;const perf=takePerf(t,p);
+ D.phrases.forEach(p=>{if(!['done','stale','failed','lost'].includes(p.status))return;const t=activeTake(p.key);if(!t)return;const perf=takePerf(t,p);
   const legacy=perf.notes.every(n=>n.id==null),byOrder=legacy&&perf.notes.length===p.idx.length;
   let d='',pen=false,lastCi=-9;
   perf.notes.forEach((n,ni)=>{if(!n.k){pen=false;return}
@@ -1027,7 +1113,7 @@ function f0SVG(W,H){
    for(let j=j0;j<j1;j++){const m=perf.vals[j];if(m==null||isNaN(m)){pen=false;continue}
     const f=Math.min(1,Math.max(0,(j*perf.hop-n.s)/span));
     d+=(pen?'L':'M')+((b0+f*(b1-b0))*S.ppb).toFixed(1)+' '+((MAXP-m+.5)*S.rowH).toFixed(1);pen=true}});
-  if(d)out+=`<g class="${p.status==='stale'?'stale':''}"><path class="u" d="${d}"/><path class="l" d="${d}"/></g>`});
+  if(d)out+=`<g class="${p.status==='done'?'':'stale'}"><path class="u" d="${d}"/><path class="l" d="${d}"/></g>`});
  return out?`<svg class="f0" width="${W}" height="${H}" aria-hidden="true">${out}</svg>`:'';
 }
 // YIN pitch tracking on returned audio, used when the service does not send an f0 track
@@ -1072,7 +1158,7 @@ function renderInspector(){
  const b=$('#inspBody');
  if(S.tab==='props')b.innerHTML=propsHTML();
  else if(S.tab==='gen')b.innerHTML=genHTML();
- else if(S.tab==='takes'){b.innerHTML=takesHTML();$$('#inspBody canvas[data-take]').forEach(c=>{const[k,id]=c.dataset.take.split('|');const t=(S.renders[k]?.takes||[]).find(x=>x.id===id);if(t)drawTakeWave(c,D.byKey[k],t,t.hash!==D.byKey[k]?.hash)})}
+ else if(S.tab==='takes'){b.innerHTML=takesHTML();$$('#inspBody canvas[data-take]').forEach(c=>{const[k,id]=c.dataset.take.split('|');const t=(S.renders[k]?.takes||[]).find(x=>x.id===id);if(!t)return;const dim=t.hash!==D.byKey[k]?.hash;if(t.buffer)drawWave(c,t.buffer,cssVar(dim?'--wave-dim':'--wave'));else drawTakeWave(c,D.byKey[k],t,dim)})}
  else b.innerHTML=apiHTML();
  fillRanges(b);
 }
@@ -1084,7 +1170,7 @@ function propsHTML(){
   ${e.kind==='note'&&e.word!=='-'?`<div class="fld"><label for="pLyric">歌词 <span class="hint">一个汉字；输入多个字会依次填到后面的音符</span></label><input class="inp" id="pLyric" value="${esc(e.word)}" autocomplete="off"></div>`:''}
   ${e.kind==='note'?`<div class="fld"><div class="lab">音高 <span class="v">${pname(e.pitch)} · MIDI ${e.pitch}</span></div><div class="row"><button class="btn line" data-tr="-12">−8va</button><button class="btn line" data-tr="-1">−1</button><input class="inp mono" id="pPitch" type="number" min="${MINP}" max="${MAXP}" value="${e.pitch}" style="text-align:center"><button class="btn line" data-tr="1">+1</button><button class="btn line" data-tr="12">+8va</button></div></div>`:''}
   <div class="fld"><div class="lab">时值 <span class="v">${NV[e.dur].n} · ${(NV[e.dur].b*60/S.bpm).toFixed(3)}s</span></div><div class="grid12">${NV.map((n,k)=>`<button data-dur="${k}" class="${k===e.dur?'on':''}" title="${n.n} &lt;${n.t}&gt;">${n.l}</button>`).join('')}</div></div>
-  <div class="card" style="font-size:12px;line-height:1.7"><div class="row" style="justify-content:space-between"><span>位置</span><span class="mono">${posStr(D.starts[i])}</span></div><div class="row" style="justify-content:space-between"><span>Token</span><span class="mono">&lt;${NV[e.dur].t}&gt;</span></div><div class="row" style="justify-content:space-between"><span>所在乐句</span><span>${p?`P${p.n} · ${STATUS_TXT[p.status]}`:'—（休止分隔乐句）'}</span></div></div>
+  <div class="card" style="font-size:12px;line-height:1.7"><div class="row" style="justify-content:space-between"><span>位置</span><span class="mono">${posStr(D.starts[i])}</span></div><div class="row" style="justify-content:space-between"><span>Token</span><span class="mono">&lt;${NV[e.dur].t}&gt;</span></div><div class="row" style="justify-content:space-between"><span>所在乐句</span><span>${p?`P${p.n} · ${stText(p)}`:'—（休止分隔乐句）'}</span></div></div>
   ${issuesFor(i)}`}
  if(sel.length>1){const notes=sel.filter(([e])=>e.kind==='note');
   return `<div class="card" style="margin-bottom:14px">已选中 <b>${sel.length}</b> 个事件（其中 ${notes.length} 个音符）</div>
@@ -1102,7 +1188,7 @@ function propsHTML(){
    <div class="row" style="justify-content:space-between"><span>模型</span><span>${S.ckpt}</span></div>
    <div class="row" style="justify-content:space-between"><span>输出</span><span>48 kHz · 单声道</span></div></div></div>
   <div class="sec-h"><h3>乐句</h3><span class="hint">按休止自动分句，每句独立渲染</span></div>
-  <div class="plist">${D.phrases.map(p=>`<button class="pitem" data-gop="${p.key}"><span class="pn">P${p.n}</span><span class="pl">${esc(p.text||'（换气）')}</span><span class="tag ${p.status==='done'?'ok':p.status==='stale'?'warn':p.status==='error'?'err':p.status==='none'?'':'acc'}">${STATUS_TXT[p.status]}</span></button>`).join('')||'<div class="empty">还没有乐句</div>'}</div>
+  <div class="plist">${D.phrases.map(p=>`<button class="pitem" data-gop="${p.key}"><span class="pn">P${p.n}</span><span class="pl">${esc(p.text||'（换气）')}</span><span class="tag ${stTag(p.status)}">${stText(p)}</span></button>`).join('')||'<div class="empty">还没有乐句</div>'}</div>
   <p class="hint" style="margin-top:12px">点选音符可编辑歌词、音高和时值。模型按乐谱生成，时值以音符类型表示，不需要逐字对齐时长。</p>`;
 }
 function issuesFor(i){const l=D.issues.filter(x=>x.i===i);if(!l.length)return'';return `<div style="margin-top:12px">${l.map(x=>`<div class="issue ${x.lv}" style="cursor:default"><span class="ic"></span><span>${esc(x.msg)}</span></div>`).join('')}</div>`}
@@ -1144,23 +1230,24 @@ function takesHTML(){
  const r=S.renders[p.key]||{takes:[]};const st=p.status;
  const busy=st==='queued'||st==='rendering';
  return phraseChips(p,'data-takep')+`
- <div class="card" style="margin-bottom:12px"><div class="row" style="justify-content:space-between;margin-bottom:4px"><b>乐句 ${p.n}</b><span class="tag ${st==='done'?'ok':st==='stale'?'warn':st==='error'?'err':busy?'acc':''}">${STATUS_TXT[st]}</span></div>
+ <div class="card" style="margin-bottom:12px"><div class="row" style="justify-content:space-between;margin-bottom:4px"><b>乐句 ${p.n}</b><span class="tag ${stTag(st)}">${stText(p)}</span></div>
  <div style="font-size:15px;letter-spacing:.06em;margin:4px 0 6px">${esc(p.text||'（换气）')}</div>
  <div class="hint mono">${posStr(p.start)} → ${posStr(p.end)} · ${p.req.pitch.length} 事件 · ${p.req.word.length} 单元</div></div>
- <div class="row" style="margin-bottom:14px"><button class="btn primary" data-act="newtake" style="flex:1" ${busy||st==='error'?'disabled':''}>${r.takes.length?'生成新版本':'渲染此乐句'}</button><button class="btn line" data-act="solo" title="只播放这一句">${icon('play',14)} 试听</button></div>
+ <div class="row" style="margin-bottom:14px"><button class="btn primary" data-act="newtake" style="flex:1" ${busy||st==='error'?'disabled':''}>${st==='failed'?'重试渲染':st==='lost'?'重新渲染':r.takes.length?'生成新版本':'渲染此乐句'}</button><button class="btn line" data-act="solo" title="只播放这一句">${icon('play',14)} 试听</button></div>
 
  ${(()=>{const o=S.phraseGen[p.key],g=genOf(p);return `<details class="pgen" ${o?'open':''}><summary>本句生成参数 ${o?'<span class="tag acc">单独设置</span>':'<span class="hint">跟随全局</span>'}</summary>
   <label class="row" style="gap:8px;font-size:12.5px;margin:8px 0 10px"><input type="checkbox" id="pgOn" ${o?'checked':''}> 这一句单独设置（其他句子不受影响）</label>
   ${o?`${pslider('cfg','乐谱遵循度',1,4,.1,g.cfg)}${pslider('temp','表现随机性',.5,1.5,.05,g.temp)}${pslider('steps','扩散步数',4,30,1,g.steps)}
   <div class="fld"><div class="lab">随机种子</div><div class="segs"><button data-pgseed="random" class="${g.seedMode==='random'?'on':''}">每次随机</button><button data-pgseed="fixed" class="${g.seedMode==='fixed'?'on':''}">固定</button></div>${g.seedMode==='fixed'?`<input class="inp mono" id="pgSeed" type="number" value="${g.seed}" style="margin-top:6px">`:''}</div>
   <p class="hint">改动后这一句会标为“已修改”，重新渲染才生效。</p>`:''}</details>`})()}
+ ${st==='failed'?`<div class="card hint" style="margin-bottom:10px;color:var(--err)">上次渲染失败：${esc(r.fail.msg)}</div>`:st==='lost'?`<div class="card hint" style="margin-bottom:10px">这一句渲染过，但音频没有保存下来（旧版本只把音频放在内存里，或浏览器数据被清理）。重新渲染后恢复。</div>`:st==='stale'&&p.svcChanged?`<div class="card hint" style="margin-bottom:10px">当前版本是${takeSvc(activeTake(p.key))==='demo'?'演示模式的模拟结果':'另一种渲染服务的结果'}，在现在的服务下需要重新渲染。</div>`:''}
  ${busy?`<div class="card hint" style="margin-bottom:10px">${st==='queued'?'排队中…':'渲染中 '+Math.round(r.job.progress*100)+'%'}<button class="btn" data-act="cancel" style="float:right;height:22px">取消</button></div>`:''}
  <div class="sec-h"><h3>版本 ${r.takes.length?`(${r.takes.length})`:''}</h3>${r.takes.length>1?'<span class="hint">点选设为当前；播放时按 T 切换</span>':''}</div>
  ${r.takes.length?[...r.takes].reverse().map(t=>`<div class="take${t.id===r.active?' act':''}">
    <input type="radio" name="take" data-pick="${t.id}" ${t.id===r.active?'checked':''} aria-label="设为当前版本">
-   <div><div class="tn">版本 ${t.n} ${t.hash!==p.hash?'<span class="tag warn">基于旧乐谱</span>':''}</div><div class="tm">seed ${t.seed} · cfg ${t.params.cfg_value} · ${t.ckpt.replace('VocalRender','VR')} · ${t.voice}</div></div>
+   <div><div class="tn">版本 ${t.n} ${takeSvc(t)==='demo'?'<span class="tag" title="演示模式的模拟结果，不是真实的演唱">模拟</span>':!t.buffer&&audioState.get(t.id)!=='loading'?'<span class="tag warn" title="这个版本的音频没有保存下来">音频已丢失</span>':''} ${!sameScore(t,p)?'<span class="tag warn">基于旧乐谱</span>':t.hash!==p.hash?'<span class="tag warn">非当前服务</span>':''}</div><div class="tm">${t.buffer?t.buffer.duration.toFixed(1)+' 秒 · ':''}seed ${t.seed} · cfg ${t.params.cfg_value} · ${t.ckpt.replace('VocalRender','VR')} · ${t.voice}</div></div>
    <div class="row"><button class="btn icon fav${t.fav?' on':''}" data-fav="${t.id}" title="${t.fav?'取消收藏':'收藏这个版本'} (F)" aria-pressed="${!!t.fav}">${t.fav?'★':'☆'}</button><button class="btn icon" data-playtake="${t.id}" title="试听此版本">${icon('play',14)}</button><button class="btn icon" data-deltake="${t.id}" title="删除此版本">${icon('x',14)}</button></div>
-   <canvas data-take="${p.key}|${t.id}"></canvas></div>`).join(''):'<div class="empty">这一句还没有渲染。<br>同一乐谱每次生成都会略有不同，可以多生成几个版本挑选。</div>'}`;
+   ${t.buffer||takeSvc(t)==='demo'?`<canvas data-take="${p.key}|${t.id}"></canvas>`:''}</div>`).join(''):'<div class="empty">这一句还没有渲染。<br>同一乐谱每次生成都会略有不同，可以多生成几个版本挑选。</div>'}`;
 }
 function apiHTML(){
  const p=D.byKey[S.apiPhrase]||curPhrase();
@@ -1212,11 +1299,11 @@ function renderStatus(){
   ${DESK?`<span>桌面版 v${esc(DESK.info.version||"")}</span>`:""}${PREFS.autoRender?'<span style="color:var(--accent)">自动渲染：开</span>':''}<span>48 kHz · 单声道 · 中文</span><span>${S.service.mode==='demo'?'演示服务（模拟）':'远程：'+esc(S.service.base)}</span><span id="saveSt" style="color:var(--fg-3)">已自动保存</span>`;
 }
 function renderTopbar(){
- const pend=D.phrases.filter(p=>p.status==='none'||p.status==='stale').length;
+ const pend=D.phrases.filter(p=>['none','stale','failed','lost'].includes(p.status)).length;
  const busy=Object.values(S.renders).filter(r=>r.job);const run=busy.find(r=>r.job.state==='rendering');
  const b=$('#btnRender');
  if(busy.length){b.innerHTML=`${icon('render')} 渲染中 ${run?Math.round(run.job.progress*100)+'%':''} <span class="cnt">${busy.length}</span>`;b.title='点击取消全部渲染'}
- else{b.innerHTML=pend?`${icon('render')} 渲染 <span class="cnt">${pend}</span>`:`${icon('render')} 全部已渲染`;b.title=pend?`渲染 ${pend} 个未渲染/已修改的乐句`:'所有乐句都是最新的'}
+ else{b.innerHTML=pend?`${icon('render')} 渲染 <span class="cnt">${pend}</span>`:`${icon('render')} 全部已渲染`;b.title=pend?`渲染 ${pend} 个未渲染、已修改或上次失败的乐句`:'所有乐句都是最新的'}
  $('#svcDot').classList.toggle('busy',!!busy.length);
  $('#svcText').textContent=(S.service.mode==='demo'?'演示服务':'远程服务')+(busy.length?` · 队列 ${busy.length}`:' · 空闲');
  $('#btnPlay').innerHTML=icon(audio.playing?'pause':'play');
@@ -1364,7 +1451,8 @@ const endScrub=()=>{if(!scrub)return;const w=scrub.was;scrub=null;if(w)play()};
 $('#ruler').addEventListener('pointerup',endScrub);$('#ruler').addEventListener('pointercancel',endScrub);
 $('#ruler').addEventListener('pointerleave',()=>{if(!scrub)hideGhost()});
 $('#ruler').addEventListener('dblclick',e=>{if(e.target.closest('.pband')||audio.playing)return;setPlayhead(rulerBeat(e));play()});
-$('#lanes').addEventListener('click',e=>{const s=e.target.closest('.lseg');if(s)selectPhrase(s.dataset.key,true);seek(snapLocate((e.clientX-lanesIn.getBoundingClientRect().left)/S.ppb,e.altKey))});
+$('#lanes').addEventListener('click',e=>{const rt=e.target.closest('[data-retry]');if(rt){selectPhrase(rt.dataset.retry,true);enqueue(rt.dataset.retry);return}
+ const s=e.target.closest('.lseg');if(s)selectPhrase(s.dataset.key,true);seek(snapLocate((e.clientX-lanesIn.getBoundingClientRect().left)/S.ppb,e.altKey))});
 $('#ruler').addEventListener('contextmenu',e=>{e.preventDefault();const pb=e.target.closest('.pband');if(!pb||!D.byKey[pb.dataset.key])return;selectPhrase(pb.dataset.key,false);popMenu(phraseMenu(pb.dataset.key),e.clientX,e.clientY)});
 function selectPhrase(key,showTakes){const p=D.byKey[key];if(!p)return;S.curPhrase=key;S.sel=new Set(p.idx.map(i=>S.events[i].id));if(showTakes)S.tab='takes';showInspOnMobile();renderAll()}
 $('#keysIn').addEventListener('pointerdown',e=>{const k=e.target.closest('.key');if(k)tone(+k.dataset.p,.35)});
@@ -1519,8 +1607,10 @@ function pianoNote(c,out,t,dur,m,vel){
  return nodes;
 }
 // Beat at which a take's voice ends when played at phrase p: the end of its audio (placed like scheduleRange does), or of its last note
+// seconds of audio before the first written note (the model's lead-in), so the audio lines up with the score
+function takeLead(t,p){return t.f0?((takePerf(t,p).notes[0]||{}).s||0):0}
 function takeEnd(t,p){const spb=60/S.bpm;
- if(t.buffer){const lead=t.f0?((takePerf(t,p).notes[0]||{}).s||0):0;return p.start+(t.buffer.duration-lead)/spb}
+ if(t.buffer)return p.start+(t.buffer.duration-takeLead(t,p))/spb;
  const n=takePerf(t,p).notes;return n.length?p.start+n[n.length-1].e/spb:p.end}
 function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
  const c=opt.c||ctx(),master=opt.master||audio.master,sink=opt.sink||audio.nodes,spb=60/S.bpm,t0=opt.c?opt.t0:c.currentTime+.08;
@@ -1530,12 +1620,13 @@ function scheduleRange(fromBeat,onlyKey,forceTake,opt={}){
  let endBeat=D.total;
  D.phrases.forEach(p=>{if(onlyKey&&p.key!==onlyKey)return;
   if(onlyKey)endBeat=p.end;
-  const take=forceTake||(opt.exp||p.status==='done'||p.status==='stale'?activeTake(p.key):null);
-  const useVoice=take&&(forceTake||opt.exp||p.status==='done');
+  const take=forceTake||(opt.exp||p.status==='done'?activeTake(p.key):null);
+  // a take is heard as its real audio, or (simulated takes only) as the built-in synth voice; a service take whose audio is gone is not "sung" by the synth
+  const useVoice=!!take&&(!!take.buffer||(takeSvc(take)==='demo'&&(!opt.exp||S.service.mode==='demo')));
   if(opt.exp&&!useVoice)return;
   // the model's audio usually runs past the written end of the phrase (lead-in, its own timing, the trailing rest):
   // keep playing until the audio itself has ended, so the last words aren't cut off
-  if(useVoice&&take.buffer){const lead=take.f0?((takePerf(take,p).notes[0]||{}).s||0):0;endBeat=Math.max(endBeat,takeEnd(take,p));let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);sink.push(s)}return}
+  if(useVoice&&take.buffer){const lead=takeLead(take,p);endBeat=Math.max(endBeat,takeEnd(take,p));let st=t0+(p.start-fromBeat)*spb-lead,off=0;if(st<t0){off=t0-st;st=t0}if(off<take.buffer.duration){const s=c.createBufferSource();s.buffer=take.buffer;s.connect(vg);s.start(st,off);sink.push(s)}return}
   const v=voiceObj();
   if(useVoice){const perf=takePerf(take,p);endBeat=Math.max(endBeat,takeEnd(take,p));const ps=p.start*spb,fsec=fromBeat*spb,vopts={vibRate:5.5,vibDepth:0,fs:v.fs||1,vol:1};
    perf.notes.forEach(n=>{if(!n.k&&n.w!=='AP')return;const a=ps+n.s,off=Math.max(0,fsec-a),dur=n.e-n.s-off;if(dur<=.01)return;const st=t0+Math.max(0,a-fsec);
@@ -1683,7 +1774,7 @@ function cycleTake(dir){const p=targetPhrase();if(!p)return;const r=S.renders[p.
  const ts=r.takes,i=ts.findIndex(t=>t.id===r.active),nx=ts[((i<0?0:i)+dir+ts.length)%ts.length];r.active=nx.id;
  const was=audio.playing,sb=audio.startBeat;renderAll();
  if(was){const b=S.playhead;pause();setPlayhead(b);play();audio.startBeat=sb;renderRuler()}
- toast(`P${p.n} · 版本 ${nx.n}（${ts.indexOf(nx)+1}/${ts.length}）${nx.fav?' ★':''}${nx.hash!==p.hash?' · 基于旧乐谱':''}`)}
+ toast(`P${p.n} · 版本 ${nx.n}（${ts.indexOf(nx)+1}/${ts.length}）${nx.fav?' ★':''}${!sameScore(nx,p)?' · 基于旧乐谱':nx.hash!==p.hash?' · 非当前服务':!takeUsable(nx)?' · 音频已丢失':''}`)}
 function toggleFav(){const p=targetPhrase(),t=p&&activeTake(p.key);if(!t)return toast('这一句还没有渲染');t.fav=!t.fav;renderAll();toast(t.fav?`已收藏 P${p.n} 的版本 ${t.n} ★`:`取消收藏 P${p.n} 的版本 ${t.n}`)}
 // ---- phrasing at the playhead ----
 function eventNearPlayhead(){const ph=S.playhead;let best=-1,bd=1e9;S.events.forEach((e,i)=>{const d=Math.abs(D.starts[i]-ph);if(d<bd){bd=d;best=i}});return best}
@@ -1731,8 +1822,10 @@ function renderable(p){return p.status!=='error'&&p.status!=='queued'&&p.status!
 // phrases are rendered in score order (P1, P2, …)
 const prio=p=>p.start;
 // a phrase whose current score/settings match an earlier take just switches back to it
-function reuseTakes(list){let n=0;list.forEach(p=>{const r=S.renders[p.key];const t=r&&[...r.takes].reverse().find(x=>x.hash===p.hash);if(t){r.active=t.id;n++}});return n}
-function pendingPhrases(){return D.phrases.filter(p=>(p.status==='none'||p.status==='stale')&&renderable(p))}
+function reuseTakes(list){let n=0;list.forEach(p=>{const r=S.renders[p.key];const t=r&&[...r.takes].reverse().find(x=>x.hash===p.hash&&takeUsable(x));if(t){r.active=t.id;n++}});return n}
+// what the render button renders: unrendered and changed phrases, plus ones whose last render failed or whose audio is gone
+// (automatic rendering does not retry failures on its own)
+function pendingPhrases(auto){return D.phrases.filter(p=>(p.status==='none'||p.status==='stale'||(!auto&&(p.status==='failed'||p.status==='lost')))&&renderable(p))}
 function renderPending(){
  const busy=Object.values(S.renders).filter(r=>r.job).length;if(busy){cancelAll();return}
  const gl=D.issues.find(x=>x.global&&x.lv==='err');if(gl)return toast(gl.msg,'err');
@@ -1744,22 +1837,42 @@ function renderPending(){
 }
 function enqueue(key,quiet){const p=D.byKey[key];if(!p||!renderable(p))return;
  const gl=D.issues.find(x=>x.global&&x.lv==='err');if(gl)return toast(gl.msg,'err');
+ if(!batch)batch={ok:0,fail:0,streak:0,halted:null,first:null};
  const r=rec(key);r.job={state:'queued',progress:0,hash:p.hash,request:renderRequest(p),snap:snapshotOf(p),voiceId:S.voice,sec:(p.end-p.start)*60/S.bpm,abort:null};queue.push(key);if(!quiet){renderAll();pump()}}
 function pump(){const conc=Math.max(1,Math.min(4,+S.service.conc||1));
  while(working.size<conc&&queue.length){const key=queue.shift(),r=S.renders[key];if(r&&r.job&&r.job.state==='queued')runJob(key,r)}}
+// One run of the queue (from the first phrase queued until nothing is left). Failures are summed up in one message at the end.
+// If the service cannot be reached, or several phrases fail in a row, the rest of the queue is stopped instead of failing one by one.
+let batch=null;
+const pn=key=>{const p=D.byKey[key];return p?'P'+p.n:'乐句'};
+function haltQueue(why){if(batch&&!batch.halted)batch.halted={why,left:queue.filter(k=>S.renders[k]&&S.renders[k].job).length};
+ queue.splice(0).forEach(k=>{const r=S.renders[k];if(r&&r.job&&r.job.state==='queued')r.job=null})}
+function endBatch(){const b=batch;batch=null;if(!b)return;
+ if(b.halted){const left=b.halted.left?`，还有 ${b.halted.left} 句没有提交`:'';
+  toast(b.halted.why==='conn'?`无法连接渲染服务，已停止渲染${left}。请检查服务地址或服务是否在运行，然后在失败的乐句上点“重试”或再次点“渲染”。`
+   :`连续 ${b.streak} 句渲染失败，已停止渲染${left}。${b.first}`,'err');return}
+ if(b.fail)toast(`${b.ok?b.ok+' 句渲染完成，':''}${b.fail} 句渲染失败（${b.first}）。可以在失败的乐句上点“重试”。`,'err');
+ else if(b.ok&&!autoRun)toast('渲染完成');
+}
 async function runJob(key,r){
- working.add(key);r.job.state='rendering';const t0=performance.now();renderAll();
+ working.add(key);r.job.state='rendering';const t0=performance.now();renderAll();const b=batch;
  try{
   const res=await Client.render(r.job.request,pr=>{if(!r.job)return;r.job.progress=pr;liveProgress(key)},r.job);
   if(!r.job)throw new Error('cancelled');
   const seed=r.job.request.generation.seed??res.seed;
-  const t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),n:(r.takes.reduce((m,x)=>Math.max(m,x.n),0))+1,seed,hash:r.job.hash,params:r.job.request.generation,ckpt:r.job.request.checkpoint,voice:(allVoices().find(v=>v.id===r.job.voiceId)||voiceObj()).name,at:Date.now(),buffer:res.buffer||null,snap:r.job.snap,f0:res.f0||null};
+  const t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),n:(r.takes.reduce((m,x)=>Math.max(m,x.n),0))+1,seed,hash:r.job.hash,params:r.job.request.generation,ckpt:r.job.request.checkpoint,voice:(allVoices().find(v=>v.id===r.job.voiceId)||voiceObj()).name,at:Date.now(),
+   svc:res.svc||'remote',buffer:res.buffer||null,dur:res.buffer?+res.buffer.duration.toFixed(3):undefined,snap:r.job.snap,f0:res.f0||null};
+  if(res.wav)audioPut(t.id,res.wav);   // keep the audio across reloads
   noteRate((performance.now()-t0)/1000,r.job.sec);
-  r.takes.push(t);r.active=t.id;r.job=null;
- }catch(err){if(r.job){r.job=null;if(err.message!=='cancelled')toast('渲染失败：'+err.message,'err')}}
- working.delete(key);renderAll();
- if(!queue.length&&!working.size&&!Object.values(S.renders).some(x=>x.job)&&!autoRun)toast('渲染完成');
- pump();
+  r.takes.push(t);r.active=t.id;r.job=null;delete r.fail;
+  if(b){b.ok++;b.streak=0}
+ }catch(err){if(r.job){const hash=r.job.hash;r.job=null;
+   if(err.message!=='cancelled'){r.fail={msg:err.message,hash,at:Date.now()};
+    if(b){b.fail++;b.streak++;if(!b.first)b.first=`${pn(key)}：${err.message}`;if(err.conn)haltQueue('conn');else if(b.streak>=3)haltQueue('streak')}
+    else toast(`${pn(key)} 渲染失败：${err.message}`,'err')}}}
+ working.delete(key);
+ if(!queue.length&&!working.size&&!Object.values(S.renders).some(x=>x.job)&&batch===b)endBatch();
+ renderAll();pump();
 }
 // rendering speed (seconds of work per second of audio), remembered per service to estimate waiting time
 function rateKey(){return 'vrstudio.rate.'+(S.service.mode==='demo'?'demo':S.service.base)}
@@ -1770,7 +1883,7 @@ let autoT=0,autoRun=false;
 function scheduleAuto(){if(!PREFS.autoRender)return;clearTimeout(autoT);autoT=setTimeout(autoRenderNow,3000)}
 function autoRenderNow(){if(!PREFS.autoRender)return;if(drag||lyrEdit||!$('#overlay').hidden){scheduleAuto();return}
  if(D.issues.some(x=>x.global&&x.lv==='err'))return;
- let list=pendingPhrases();if(!list.length)return;if(reuseTakes(list)){renderAll();list=pendingPhrases()}
+ let list=pendingPhrases(true);if(!list.length)return;if(reuseTakes(list)){renderAll();list=pendingPhrases(true)}
  if(!list.length)return;autoRun=true;list.sort((a,b)=>prio(a)-prio(b)).forEach(p=>enqueue(p.key,true));renderAll();pump();
  const done=()=>{if(working.size||queue.length)return setTimeout(done,500);autoRun=false};done()}
 function liveProgress(key){
@@ -1779,9 +1892,11 @@ function liveProgress(key){
  const seg=$(`.lseg[data-key="${key}"]`);if(seg){seg.innerHTML=`<span class="prog" style="width:${pr*100}%"></span><span class="lbl">渲染中 ${Math.round(pr*100)}%</span>`}
  renderTopbar();
 }
-function cancelAll(){queue.length=0;autoRun=false;clearTimeout(autoT);Object.values(S.renders).forEach(r=>{if(r.job){r.job.abort&&r.job.abort();r.job=null}});renderAll();toast('已取消渲染')}
+function cancelAll(){queue.length=0;batch=null;autoRun=false;clearTimeout(autoT);Object.values(S.renders).forEach(r=>{if(r.job){r.job.abort&&r.job.abort();r.job=null}});renderAll();toast('已取消渲染')}
 function cancelOne(key){const r=S.renders[key];if(!r||!r.job)return;const qi=queue.indexOf(key);if(qi>=0)queue.splice(qi,1);r.job.abort&&r.job.abort();r.job=null;renderAll()}
 
+// a network failure (service down, wrong address, blocked): the whole queue stops instead of failing phrase by phrase
+const connErr=()=>Object.assign(new Error('无法连接服务，请检查服务地址'),{conn:true});
 const Client={
  async render(req,onProgress,job){
   if(S.service.mode==='demo')return mockRender(req,onProgress,job);
@@ -1791,15 +1906,15 @@ const Client={
   // an uploaded reference voice is sent to the service first (POST /voices); the render request then names its upload_id
   const submit=async force=>{const body={...req};
    if(v&&v.kind==='custom')body.prompt_audio={upload_id:await uploadVoice(v,base,auth,force),duration:+v.dur.toFixed(2)};
-   return http(base+'/render',{method:'POST',headers:H,body:JSON.stringify(body),signal:ac.signal}).catch(()=>{throw new Error('无法连接服务，请检查服务地址')})};
+   return http(base+'/render',{method:'POST',headers:H,body:JSON.stringify(body),signal:ac.signal}).catch(e=>{throw ac.signal.aborted?new Error('cancelled'):connErr()})};
   let r=await submit(false);
   if(!r.ok){const msg=await errText(r);
    // the service may have forgotten an earlier upload (restart, expiry): upload again once and retry
    if(v&&v.kind==='custom'&&/upload/i.test(msg)){r=await submit(true);if(!r.ok)throw new Error(await errText(r))}else throw new Error(msg)}
   const{job_id}=await r.json();
-  for(;;){await sleep(700);if(ac.signal.aborted)throw new Error('cancelled');const s=await http(`${base}/jobs/${job_id}`,{headers:auth,signal:ac.signal});if(!s.ok)throw new Error(await errText(s));const j=await s.json();
+  for(;;){await sleep(700);if(ac.signal.aborted)throw new Error('cancelled');const s=await http(`${base}/jobs/${job_id}`,{headers:auth,signal:ac.signal}).catch(e=>{throw ac.signal.aborted?new Error('cancelled'):connErr()});if(!s.ok)throw new Error(await errText(s));const j=await s.json();
    onProgress(j.progress||0);
-   if(j.status==='succeeded'){const a=await http(j.audio_url?new URL(j.audio_url,base+'/').toString():`${base}/jobs/${job_id}/audio`,{headers:auth,signal:ac.signal});if(!a.ok)throw new Error('下载渲染结果失败：'+await errText(a));const buf=await ctx().decodeAudioData(await a.arrayBuffer());const f0=j.f0&&Array.isArray(j.f0.hz)?{hop:+j.f0.hop_s||.01,vals:j.f0.hz.map(h=>h>0?+(69+12*Math.log2(h/440)).toFixed(2):null)}:extractF0(buf);return{buffer:buf,seed:j.seed,f0}}
+   if(j.status==='succeeded'){const a=await http(j.audio_url?new URL(j.audio_url,base+'/').toString():`${base}/jobs/${job_id}/audio`,{headers:auth,signal:ac.signal});if(!a.ok)throw new Error('下载渲染结果失败：'+await errText(a));const wav=await a.arrayBuffer(),buf=await ctx().decodeAudioData(wav.slice(0));const f0=j.f0&&Array.isArray(j.f0.hz)?{hop:+j.f0.hop_s||.01,vals:j.f0.hz.map(h=>h>0?+(69+12*Math.log2(h/440)).toFixed(2):null)}:extractF0(buf);return{buffer:buf,wav,svc:'remote',seed:j.seed,f0}}
    if(j.status==='failed')throw new Error(j.error||j.detail||'服务端渲染失败')}
  },
  async health(){if(S.service.mode==='demo')return '演示服务正常';const r=await http(S.service.base.replace(/\/$/,'')+'/health');if(!r.ok)throw new Error('HTTP '+r.status);return '连接成功'}
@@ -1821,7 +1936,7 @@ function multipart(fields){const bd='----VocalRenderStudio'+Math.random().toStri
  return{body:out,type:'multipart/form-data; boundary='+bd}}
 async function uploadVoice(v,base,auth,force){v.uploads=v.uploads||{};if(!force&&v.uploads[base])return v.uploads[base];
  const{body,type}=multipart({file:{name:'reference.wav',type:'audio/wav',data:voiceWav(v)},name:v.name});
- const r=await http(base+'/voices',{method:'POST',headers:{...auth,'Content-Type':type},body}).catch(()=>{throw new Error('无法连接服务，请检查服务地址')});
+ const r=await http(base+'/voices',{method:'POST',headers:{...auth,'Content-Type':type},body}).catch(()=>{throw connErr()});
  if(!r.ok)throw new Error('上传参考音频失败：'+await errText(r));
  const j=await r.json().catch(()=>({}));if(!j.upload_id)throw new Error('上传参考音频失败：服务没有返回 upload_id');
  return v.uploads[base]=j.upload_id}
@@ -1836,7 +1951,7 @@ function restoreVoices(list){
 function removeVoice(id){const v=S.customVoices.find(x=>x.id===id);if(!v)return;S.customVoices=S.customVoices.filter(x=>x!==v);if(S.voice===id)S.voice='Alto-1';renderVoices();renderAll();toast(`已移除参考声线「${v.name}」`)}
 function mockRender(req,onProgress,job){return new Promise((res,rej)=>{
  const total=900+req.score.pitch.length*110*(req.generation.inference_timesteps/10);const t0=performance.now();
- const iv=setInterval(()=>{const pr=Math.min(1,(performance.now()-t0)/total);onProgress(pr);if(pr>=1){clearInterval(iv);res({seed:Math.floor(Math.random()*1e9)})}},90);
+ const iv=setInterval(()=>{const pr=Math.min(1,(performance.now()-t0)/total);onProgress(pr);if(pr>=1){clearInterval(iv);res({seed:Math.floor(Math.random()*1e9),svc:'demo'})}},90);
  job.abort=()=>{clearInterval(iv);rej(new Error('cancelled'))};})}
 
 /* ================= dialogs, menus, toasts ================= */
@@ -1846,7 +1961,7 @@ function closeDialog(){$('#overlay').hidden=true;$('#overlay').innerHTML=''}
 $('#overlay').addEventListener('click',e=>{if(e.target.closest('[data-close]')||(e.target.id==='overlay'&&!$('#overlay [data-modal]')))closeDialog()});
 const MENUS={
  file:[['新建空白工程',DESK?'Ctrl+N':'',()=>newProject()],['打开工程文件…','Ctrl+O',()=>openProject()],...(DESK?[['保存','Ctrl+S',()=>saveProject(false)],['另存为…','Ctrl+Shift+S',()=>saveProject(true)]]:[]),0,
-  ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};S.refF0=null;renderAll();toast('已载入示例')}],0,
+  ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};S.refF0=null;renderAll();audioGC();toast('已载入示例')}],0,
   ['导入乐谱（MusicXML / MIDI / JSON / 标记序列）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],['导出乐谱（MIDI）…','',()=>exportScore('mid')],['导出乐谱（VocalRender JSON）…','',()=>exportScore('json')],['导出乐谱（标记序列）…','',()=>exportScore('tok')],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
  edit:()=>[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending],0,
   ['移调…','K',()=>transposeDlg()],0,['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.autoRender?'✓ ':'')+'改动后自动渲染','',()=>{PREFS.autoRender=!PREFS.autoRender;savePrefs();renderInspector();renderStatus();if(PREFS.autoRender){toast('停止编辑约 3 秒后自动渲染改动的乐句');scheduleAuto()}else toast('已关闭自动渲染')}],0,[(PREFS.scaleHL?'✓ ':'')+'高亮调内音','',()=>{PREFS.scaleHL=!PREFS.scaleHL;savePrefs();renderAll()}],[(PREFS.scaleSnap?'✓ ':'')+'拖动时吸附调内音','',()=>{PREFS.scaleSnap=!PREFS.scaleSnap;savePrefs();renderAll()}],[(PREFS.segLines?'✓ ':'')+'显示乐句边界线','',()=>{PREFS.segLines=!PREFS.segLines;savePrefs();renderRoll()}],0,[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
@@ -1876,13 +1991,13 @@ function settingsDlg(){const s=S.service;
  dialog('服务设置',`<div class="fld"><div class="lab">渲染服务</div><div class="segs"><button data-sm="demo" class="${s.mode==='demo'?'on':''}">演示（模拟渲染）</button><button data-sm="remote" class="${s.mode==='remote'?'on':''}">连接 VocalRender 服务</button></div></div>
  <div class="fld"><label for="sBase">服务地址</label><input class="inp mono" id="sBase" value="${esc(s.base)}" placeholder="https://your-gpu-server/v1"></div>
  <div class="fld"><label for="sConc">同时渲染</label><select class="inp" id="sConc" style="width:auto">${[1,2,3,4].map(n=>`<option value="${n}" ${+s.conc===n?'selected':''}>${n} 句</option>`).join('')}</select><p class="hint">服务端有多张显卡或支持批处理时可以调大；只有一张显卡时保持 1。</p></div>
- <div class="fld"><label for="sKey">访问 Token（可选）</label><input class="inp mono" id="sKey" type="password" value="${esc(s.key)}" autocomplete="off"><p class="hint">只保存在当前页面内存中，刷新后需重新填写。</p></div>
+ <div class="fld"><label for="sKey">访问 Token（可选）</label><input class="inp mono" id="sKey" type="password" value="${esc(s.key)}" autocomplete="off"><p class="hint">Token 只保存在当前页面内存中，刷新后需重新填写；服务地址、模式和并发数会记在本机。</p></div>
  <div class="card hint">远程模式按“接口”面板里的端点调用：POST /render 提交、GET /jobs/{id} 轮询、取回 48 kHz WAV。服务端可基于官方 <span class="mono">demo/app.py</span> 封装。<br>${DESK?'桌面版由系统网络直接连接服务，不受浏览器跨域限制。':'网页版直接从浏览器请求，服务端需要允许跨域（CORS）。'}</div>`,
  `<button class="btn line" id="sTest">测试连接</button><button class="btn primary" id="sSave">保存</button>`,o=>{
   let mode=s.mode;o.querySelectorAll('[data-sm]').forEach(b=>b.onclick=()=>{mode=b.dataset.sm;o.querySelectorAll('[data-sm]').forEach(x=>x.classList.toggle('on',x===b))});
   const apply=()=>{s.mode=mode;s.base=o.querySelector('#sBase').value.trim();s.key=o.querySelector('#sKey').value;s.conc=+o.querySelector('#sConc').value||1};
   o.querySelector('#sTest').onclick=async()=>{const old={...s};apply();try{toast(await Client.health())}catch(e){toast('连接失败：'+e.message,'err')}Object.assign(s,old)};
-  o.querySelector('#sSave').onclick=()=>{apply();closeDialog();renderAll();toast(s.mode==='demo'?'已切换到演示服务':'已切换到远程服务')}})}
+  o.querySelector('#sSave').onclick=()=>{apply();saveService();closeDialog();renderAll();toast(s.mode==='demo'?'已切换到演示服务':'已切换到远程服务')}})}
 // ---- Timed transcriptions: text / note_pitch / note_type / duration (seconds), optional time [ms] and f0 ----
 function asList(v){return Array.isArray(v)?v.map(String):String(v==null?'':v).trim().split(/\s+/).filter(Boolean)}
 function isTranscript(d){const a=Array.isArray(d)?d:[d];return a.length>0&&a.every(x=>x&&typeof x==='object'&&x.text!=null&&x.duration!=null&&x.note_pitch!=null)}
@@ -2268,12 +2383,13 @@ function fromLabel(d){
   return{id:uid(),kind:'note',word:mel?'-':w,pitch:+p,dur:idx[t]}});
 }
 function exportDlg(){
- const st=D.phrases.map(p=>p.status),all=st.length,done=st.filter(s=>s==='done').length,stale=st.filter(s=>s==='stale').length,none=all-done-stale;const cp=curPhrase();
+ // what each phrase becomes in the file: its current take, an older take (score changed since), or silence
+ const xs=D.phrases.map(exportKind),all=xs.length,done=xs.filter(s=>s==='cur').length,stale=xs.filter(s=>s==='old').length,none=all-done-stale;const cp=curPhrase();
  const opt={range:'all',bits:'24',key:cp?cp.key:null};
  dialog('导出音频',`<div class="fld"><div class="lab">范围</div><div class="segs" data-opt="range"><button class="on" data-v="all">整首</button><button data-v="phrase" ${cp?'':'disabled'}>当前乐句${cp?' P'+cp.n:''}</button></div></div>
  <div class="fld"><div class="lab">格式</div><div class="segs" data-opt="bits"><button class="on" data-v="24">WAV · 48 kHz · 24-bit</button><button data-v="16">WAV · 48 kHz · 16-bit</button></div></div>
  <div class="fld"><label class="row" style="gap:8px;font-size:12.5px"><input type="checkbox" id="expBk" ${S.backing?'':'disabled'}> 混入伴奏${S.backing?'':'（还没有导入伴奏）'}</label></div>
- <div class="card hint">${done}/${all} 个乐句是最新渲染。${stale?stale+' 个乐句改动后还没重新渲染，会按旧版本导出。':''}${none?none+' 个乐句未渲染，导出为静音，建议先渲染。':''}${DESK?'':'<br>网页版不能写入本地文件，请使用桌面版导出 WAV。'}</div>`,
+ <div class="card hint">${done}/${all} 个乐句是最新渲染。${stale?stale+' 个乐句改动后还没重新渲染，会按旧版本导出。':''}${none?none+' 个乐句没有可用的渲染结果（未渲染、渲染失败、音频已丢失或只有演示模式的模拟结果），导出为静音，建议先渲染。':''}${DESK?'':'<br>网页版不能写入本地文件，请使用桌面版导出 WAV。'}</div>`,
  `${none||stale?'<button class="btn line" id="expRender">先渲染</button>':''}<button class="btn line" data-close>取消</button><button class="btn primary" id="expGo" ${DESK?'':'disabled'}>导出</button>`,o=>{
   o.querySelectorAll('[data-opt]').forEach(sg=>sg.querySelectorAll('button').forEach(b=>b.onclick=()=>{if(b.disabled)return;opt[sg.dataset.opt]=b.dataset.v;sg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))}));
   const rb=o.querySelector('#expRender');if(rb)rb.onclick=()=>{closeDialog();renderPending()};
@@ -2319,7 +2435,7 @@ function http(url,init={}){
  return DESK.request({url:String(url),method:init.method||'GET',headers:init.headers||{},...(b instanceof Uint8Array?{bodyB64:bytesToB64(b)}:{body:typeof b==='string'?b:null})})
   .then(r=>new Response([101,204,205,304].includes(r.status)?null:b64ToBytes(r.body),{status:r.status,statusText:r.statusText||'',headers:r.headers||{}}));
 }
-function projectData(){const renders={};Object.entries(S.renders).forEach(([k,r])=>{if(r.takes.length)renders[k]={takes:r.takes.map(t=>({...t,buffer:undefined})),active:r.active,job:null}});
+function projectData(){const renders={};Object.entries(S.renders).forEach(([k,r])=>{if(r.takes.length)renders[k]={takes:r.takes.map(t=>({...t,svc:takeSvc(t),buffer:undefined})),active:r.active,job:null}});
  const customVoices=S.customVoices.filter(v=>v._b64||v.buffer).map(v=>({id:v.id,name:v.name,dur:+(+v.dur).toFixed(3),sr:v.sr,ch:v.ch,consent:!!v.consent,wav:voiceB64(v)}));
  return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,customVoices,refF0:S.refF0||null,refShift:S.refShift||[],phraseGen:S.phraseGen||{},key:S.key||null,renders}}
 const projectJSON=()=>JSON.stringify(projectData());
@@ -2333,11 +2449,16 @@ function loadProject(o,ref){
  Object.values(S.renders).forEach(r=>r.job=null);if(o.gen)Object.assign(S.gen,o.gen);S.refF0=o.refF0||null;S.refShift=o.refShift||[];S.phraseGen=o.phraseGen||{};S.key=o.key||null;
  S.sel.clear();S.curPhrase=null;S.playhead=0;hist=[];redo=[];perfCache.clear();
  $('#bpm').value=S.bpm;$('#bpb').value=S.bpb;$('#ckpt').value=S.ckpt;$('#projName').value=S.name;
+ hydrateAudio(o.audio&&typeof o.audio==='object'?o.audio:null);   // marks the takes as loading right away, so they do not flash "音频已丢失"
  fileRef=ref||null;renderVoices();renderAll();savedJSON=fileRef?projectJSON():null;updateTitle();
 }
 async function saveProject(as){
  if(!DESK){toast('网页版会自动保存在本机浏览器里；要保存成工程文件请使用桌面版');return false}
- try{const r=await DESK.saveFile({kind:'project',data:JSON.stringify(projectData(),null,1),path:as?null:(fileRef&&fileRef.path),defaultName:fileRef?fileRef.name:S.name+'.vrproj'});
+ // the rendered audio goes into the file too (base64 WAV per take id), so the project opens elsewhere with its takes playable
+ const audioOut={};allTakes().forEach(t=>{if(t.buffer&&takeSvc(t)==='remote')audioOut[t.id]=t});
+ try{const ids=Object.keys(audioOut);for(const id of ids){const b=await audioGet(id);audioOut[id]=b?bytesToB64(new Uint8Array(b)):bytesToB64(encodeWav(audioOut[id].buffer,16))}}
+ catch(e){toast('保存失败：'+e.message,'err');return false}
+ try{const r=await DESK.saveFile({kind:'project',data:JSON.stringify({...projectData(),audio:audioOut},null,1),path:as?null:(fileRef&&fileRef.path),defaultName:fileRef?fileRef.name:S.name+'.vrproj'});
   if(!r)return false;fileRef={path:r.path,name:r.name};savedJSON=projectJSON();updateTitle();toast('已保存 '+r.name);return true}
  catch(e){toast('保存失败：'+e.message,'err');return false}
 }
@@ -2374,12 +2495,15 @@ if(DESK){
  updateTitle();
 }
 // Offline mix of the active takes (unrendered phrases are silent), for WAV export
+// how a phrase is exported: 'cur' = its up-to-date take, 'old' = a take from before the last change, '' = silence
+// (simulated takes only count in demo mode; with a real service they would export the built-in synth as if it were the singer)
+function exportKind(p){const t=activeTake(p.key);if(!t||!(t.buffer||(takeSvc(t)==='demo'&&S.service.mode==='demo')))return '';return t.hash===p.hash?'cur':'old'}
 async function renderMix(o){
  ctx();const sr=48000,spb=60/S.bpm;let from=0,end=D.total,key=null;
  if(o.range==='phrase'){const p=D.byKey[o.key];if(!p)throw new Error('找不到当前乐句');key=p.key;from=p.start;end=p.end}
  if(end<=from)throw new Error('没有可导出的内容');
  // export until the takes' audio ends, not just at the written end
- D.phrases.forEach(p=>{if((key&&p.key!==key)||p.status!=='done')return;const t=activeTake(p.key);if(t)end=Math.max(end,takeEnd(t,p))});
+ D.phrases.forEach(p=>{if((key&&p.key!==key)||!exportKind(p))return;const t=activeTake(p.key);if(t)end=Math.max(end,takeEnd(t,p))});
  let sec=(end-from)*spb+1.6;if(o.backing&&S.backing&&!key)sec=Math.max(sec,S.backing.buffer.duration+.3);
  const oc=new OfflineAudioContext(2,Math.ceil(sec*sr),sr);
  const comp=oc.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(oc.destination);const bus=oc.createGain();bus.connect(comp);
@@ -2516,10 +2640,10 @@ $('#inspBody').addEventListener('click',e=>{
  else if(d.act==='delgap')delSel(true);
  else if(d.act==='copyapi')copyApi();
  else if(d.pick){const p=curPhrase();S.renders[p.key].active=d.pick;renderAll()}
- else if(d.playtake){const p=curPhrase();const tk=S.renders[p.key].takes.find(x=>x.id===d.playtake);play(p.key,tk)}
+ else if(d.playtake){const p=curPhrase();const tk=S.renders[p.key].takes.find(x=>x.id===d.playtake);if(tk&&!takeUsable(tk))return toast(`版本 ${tk.n} 的音频没有保存下来，无法试听；重新渲染这一句即可`);play(p.key,tk)}
  else if(d.pgseed){const p=curPhrase(),o=p&&S.phraseGen[p.key];if(o){o.seedMode=d.pgseed;renderAll()}}
  else if(d.fav){const p=curPhrase(),t=p&&S.renders[p.key].takes.find(x=>x.id===d.fav);if(t){t.fav=!t.fav;renderAll()}}
- else if(d.deltake){const p=curPhrase();const r=S.renders[p.key];r.takes=r.takes.filter(x=>x.id!==d.deltake);if(r.active===d.deltake)r.active=r.takes.length?r.takes[r.takes.length-1].id:null;renderAll()}
+ else if(d.deltake){const p=curPhrase();const r=S.renders[p.key];r.takes=r.takes.filter(x=>x.id!==d.deltake);audioDrop([d.deltake]);if(r.active===d.deltake)r.active=r.takes.length?r.takes[r.takes.length-1].id:null;renderAll()}
 });
 $('#inspBody').addEventListener('input',e=>{const t=e.target;
  if(t.dataset.g){const k=t.dataset.g;S.gen[k]=+t.value;S.gen.preset=k==='cfg'||k==='temp'?'custom':S.gen.preset;const lab=$('#v_'+k);if(lab)lab.textContent=(+t.value).toFixed(t.step<1?(t.step<.1?2:1):0);derive();renderRuler();renderLanes();renderStatus();renderTopbar();persist();
@@ -2591,10 +2715,9 @@ let rz=0;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{rend
 /* ================= boot ================= */
 $('#quickTour').onclick=()=>startTour(0);
 setTool('select');renderVoices();
-// seed demo takes for the first two phrases so the opening view shows the full workflow (example data)
 derive();
-if(!saved){D.phrases.slice(0,2).forEach((p,k)=>{const r=rec(p.key);const mk=(n,seed)=>({id:'t'+n+p.key,n,seed,hash:p.hash,params:genParams(),ckpt:S.ckpt,voice:voiceObj().name,at:Date.now()-((3-n)*60000),snap:snapshotOf(p)});r.takes=k===0?[mk(1,73021),mk(2,511984)]:[mk(1,90311)];r.active=r.takes[r.takes.length-1].id})}
 {const f=S.events.find(e=>e.word==='我')||S.events.find(e=>e.kind==='note');if(f){S.sel=new Set([f.id]);S.anchor=f.id}}
+hydrateAudio(null);   // bring back the audio of rendered takes from the browser's storage
 renderAll();
 // first visit: walk through the main areas once
 if(!(store.get('vrstudio.tour')>=TOUR_VER))setTimeout(()=>{if($('#overlay').hidden&&!tourEl)startTour(0)},700);
