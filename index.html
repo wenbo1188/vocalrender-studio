@@ -349,6 +349,34 @@ input[type=range]{accent-color:var(--accent);width:100%;height:16px}
 .pband .pu{position:absolute;left:0;bottom:0;height:2px;background:var(--fg-3);opacity:.35}
 .pband .pu.hi{background:var(--warn);opacity:.9}
 .segline{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed color-mix(in srgb,var(--accent) 75%,transparent);pointer-events:none;z-index:2}
+/* ---------- comparing two inputs: the other score is drawn as dashed ghost notes ---------- */
+:root{--cmp:#0b8f83;--cmp-soft:rgba(11,143,131,.13)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--cmp:#45d0c1;--cmp-soft:rgba(69,208,193,.15)}}
+:root[data-theme="dark"]{--cmp:#45d0c1;--cmp-soft:rgba(69,208,193,.15)}
+.cmpbar{display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--cmp-soft);font-size:12px;color:var(--fg-2);flex-wrap:wrap;flex:none}
+.cmpbar[hidden]{display:none}
+.cmpbar .ttl{font-weight:600;color:var(--fg)}
+.cmpbar .ab{display:flex;border:1px solid var(--cmp);border-radius:7px;overflow:hidden;flex:none;max-width:100%}
+.cmpbar .ab button{height:26px;padding:0 10px;border:0;background:var(--raised);color:var(--fg);font-size:12px;display:flex;align-items:center;gap:6px;max-width:230px;min-width:0}
+.cmpbar .ab button+button{border-left:1px solid var(--cmp)}
+.cmpbar .ab button.on{background:var(--cmp);color:var(--raised);font-weight:600}
+.cmpbar .ab .k{font-weight:700;flex:none}
+.cmpbar .ab .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmpbar .df b{color:var(--fg);font-weight:600}
+.cmpbar .sp{flex:1}
+.cmpbar label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.gn{position:absolute;border-radius:4px;border:1.5px dashed var(--cmp);background:var(--cmp-soft);color:var(--cmp);font-size:11px;line-height:1;display:flex;align-items:center;padding-left:4px;overflow:hidden;white-space:nowrap;pointer-events:none;box-sizing:border-box}
+.gn.only{border-style:solid}
+.note.df{outline:1.5px solid var(--cmp);outline-offset:1.5px}
+.rest.df{box-shadow:inset 0 0 0 1.5px var(--cmp)}
+.gr{position:absolute;top:0;bottom:0;border:1.5px dashed var(--cmp);border-top:0;border-bottom:0;background:var(--cmp-soft);pointer-events:none;box-sizing:border-box}
+.gr span{position:sticky;top:26px;display:inline-block;margin:26px 0 0 3px;font-size:10px;line-height:13px;padding:0 3px;border-radius:3px;background:var(--cmp);color:var(--raised);white-space:nowrap}
+.cw{position:absolute;z-index:6;pointer-events:none;font-size:10px;line-height:13px;height:13px;padding:0 3px;border-radius:3px;background:var(--cmp);color:var(--raised);white-space:nowrap}
+.ruler .cmk{position:absolute;top:0;width:3px;height:6px;margin-left:-1px;background:var(--cmp);border-radius:0 0 2px 2px;pointer-events:none}
+.cmp-slot{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--raised)}
+.cmp-slot.ok{border-color:var(--cmp)}
+.cmp-slot .cmp-k{width:22px;height:22px;border-radius:50%;background:var(--cmp);color:var(--raised);font-weight:700;font-size:12px;display:grid;place-items:center;flex:none}
+.dlg .cmp-slot textarea{width:100%;min-height:46px;height:46px;font-family:var(--f-mono);font-size:11px;margin-bottom:6px}
 .note.ook{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 2px,transparent 2px 6px)}
 .segprev{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px;font-variant-numeric:tabular-nums}
 .segprev th{font-weight:500;color:var(--fg-3);text-align:right;padding:3px 4px}.segprev th:first-child,.segprev td:first-child{text-align:left}
@@ -619,6 +647,7 @@ html.win11 :focus-visible{outline:2px solid var(--fg);outline-offset:1px}
           <button class="btn icon" id="zIn" title="放大">+</button>
         </div>
       </div>
+      <div class="cmpbar" id="cmpBar" hidden></div>
       <div class="rollwrap">
         <div class="corner mono" id="corner">♩=90</div>
         <div class="ruler" id="ruler"><div class="ruler-inner" id="rulerIn"></div></div>
@@ -730,6 +759,7 @@ const S={
  quickHidden:false, showF0:true};
 // service address, mode and concurrency are remembered on this machine; the access token is not
 {const sv=store.get('vrstudio.service');if(sv&&typeof sv==='object'){if(sv.mode==='demo'||sv.mode==='remote')S.service.mode=sv.mode;if(typeof sv.base==='string'&&sv.base.trim())S.service.base=sv.base.trim();if(+sv.conc)S.service.conc=Math.max(1,Math.min(4,Math.round(+sv.conc)))}}
+S.cmp=null;   // comparing two inputs: see "compare two inputs" below
 const saveService=()=>store.set('vrstudio.service',{mode:S.service.mode,base:S.service.base,conc:S.service.conc});
 const saved=store.get('vrstudio.project');
 if(saved&&Array.isArray(saved.events)&&saved.events.length){
@@ -745,6 +775,7 @@ if(saved&&Array.isArray(saved.events)&&saved.events.length){
  if(Array.isArray(saved.refShift)) S.refShift=saved.refShift;
  if(saved.phraseGen&&typeof saved.phraseGen==='object') S.phraseGen=saved.phraseGen;
  if(saved.key) S.key=saved.key;
+ if(saved.compare) S.cmp=restoreCmp(saved.compare);
 }
 S.quickHidden=!!store.get('vrstudio.quickHidden');
 if(store.get('vrstudio.showF0')===false)S.showF0=false;
@@ -770,6 +801,7 @@ function derive(){
  D.key=S.key?{...S.key,sure:true,manual:true}:detectKey(noteIdx(null));
  validate();
  phrases.forEach(p=>{p.status=phraseStatus(p);const t=activeTake(p.key);p.svcChanged=p.status==='stale'&&!!t&&sameScore(t,p)});
+ D.cmp=S.cmp?cmpDiff():null;
 }
 // Phrasing: which stretches of the score are rendered as one request.
 // 1) cut the score into chunks at rests and at manual "split here" marks (chunks too big for one request are cut at word starts);
@@ -943,11 +975,15 @@ function renderRoll(){
  const yTop=(MAXP-v.range[1])*S.rowH,yBot=(MAXP-v.range[0]+1)*S.rowH;
  h+=`<div class="outband" style="top:0;height:${yTop}px"></div><div class="outband" style="top:${yBot}px;bottom:0"></div>`;
  h+=refSVG(W,H);
+ const cmp=D.cmp&&S.cmp.show!==false?D.cmp:null,oth=cmp?(S.cmp.cur==='a'?'B':'A'):'';
+ if(cmp)cmp.ghost.forEach(g=>{if(g.rest){h+=`<div class="gr" style="left:${g.x*S.ppb}px;width:${Math.max(3,g.w*S.ppb)}px"><span>${oth} ${g.word==='breath'?'AP':'SP'}</span></div>`;return}
+  if(g.p>MAXP||g.p<MINP)return;h+=`<div class="gn${g.only?' only':''}" style="left:${g.x*S.ppb+1}px;top:${(MAXP-g.p)*S.rowH}px;width:${Math.max(4,g.w*S.ppb-2)}px;height:${S.rowH-1}px">${g.word==='-'?'–':esc(g.word)}</div>`});
  if(ghostBeat!=null)h+=`<div class="gghost" id="gGhost" style="left:${ghostBeat*S.ppb}px"></div>`;
  S.events.forEach((e,i)=>{const x=D.starts[i]*S.ppb,w=beats(e)*S.ppb;const sel=S.sel.has(e.id);
-  if(e.kind!=='note'){const inph=e.kind==='rest'&&D.pOf[i];h+=`<div class="rest${e.kind==='breath'?' breath':''}${inph?' inph':''}${sel?' sel':''}${erasing(e)?' erasing':''}" data-i="${i}" style="left:${x}px;width:${w}px" title="${e.kind==='breath'?'换气 AP':'休止 SP'} · ${NV[e.dur].n}${inph?` · 在乐句 P${inph.n} 内，这里不断句`:e.kind==='rest'?' · 在这里断句':''}${e.seg==='join'?'（手动合并）':e.seg==='break'?'（手动断句）':''}"><span class="rl">${e.kind==='breath'?(w>=64?'AP 换气':'AP'):'SP'+(e.seg==='join'?' · 合并':inph&&w>=64?' · 句内':'')}</span></div>`;return}
+  if(e.kind!=='note'){const inph=e.kind==='rest'&&D.pOf[i];h+=`<div class="rest${e.kind==='breath'?' breath':''}${inph?' inph':''}${sel?' sel':''}${erasing(e)?' erasing':''}${cmp&&cmp.cur.has(i)?' df':''}" data-i="${i}" style="left:${x}px;width:${w}px" title="${e.kind==='breath'?'换气 AP':'休止 SP'} · ${NV[e.dur].n}${inph?` · 在乐句 P${inph.n} 内，这里不断句`:e.kind==='rest'?' · 在这里断句':''}${e.seg==='join'?'（手动合并）':e.seg==='break'?'（手动断句）':''}"><span class="rl">${e.kind==='breath'?(w>=64?'AP 换气':'AP'):'SP'+(e.seg==='join'?' · 合并':inph&&w>=64?' · 句内':'')}</span></div>`;return}
   const y=(MAXP-e.pitch)*S.rowH;const mel=e.word==='-';
-  const cls=['note',mel?'mel':'',sel?'sel':'',erasing(e)?'erasing':'',pv&&pv.has(i)?'pvt':'',PREFS.scaleHL&&D.key&&!inKey(e.pitch)?'ook':'',D.errIdx.has(i)?'err':'',D.warnIdx.has(i)?'warn':''].join(' ');
+  const cls=['note',mel?'mel':'',sel?'sel':'',erasing(e)?'erasing':'',pv&&pv.has(i)?'pvt':'',PREFS.scaleHL&&D.key&&!inKey(e.pitch)?'ook':'',D.errIdx.has(i)?'err':'',D.warnIdx.has(i)?'warn':'',cmp&&cmp.cur.has(i)?'df':''].join(' ');
+  if(cmp&&cmp.cur.has(i)&&cmp.cur.get(i).word)h+=`<span class="cw" style="left:${x+1}px;top:${y+S.rowH}px">${oth} ${cmp.cur.get(i).ow==='-'?'–':esc(cmp.cur.get(i).ow)}</span>`;
   h+=`<div class="${cls}" data-i="${i}" style="left:${x+1}px;top:${y}px;width:${Math.max(4,w-2)}px;height:${S.rowH-1}px" title="${esc(e.word)} · ${pname(e.pitch)} · ${NV[e.dur].n}"><span class="edge"></span></div><span class="nl${mel?' mel':''}${sel?' sel':''}${erasing(e)?' erasing':''}${pv&&pv.has(i)?' pv':''}" data-i="${i}" style="left:${x+3}px;top:${y+2}px;height:${S.rowH-5}px;max-width:${Math.max(0,w-10)}px"${pv&&pv.has(i)?` title="原来是“${esc(e.word)}”"`:''}>${pv&&pv.has(i)?esc(pv.get(i)):mel?'–':esc(e.word||'?')}</span>`;
  });
  if(drag&&drag.mode==='resize'){const i=drag.i,x0=D.starts[i]*S.ppb;
@@ -969,6 +1005,7 @@ function renderRuler(){
   h+=`<div class="pband ${p.status}${S.curPhrase===p.key?' cur':''}" data-key="${p.key}" style="left:${p.start*S.ppb+1}px;width:${(p.end-p.start)*S.ppb-2}px" title="乐句 ${p.n} · ${stText(p)} · ${((p.end-p.start)*60/S.bpm).toFixed(1)} 秒 · ${p.req.word.length}/${LIMIT_UNITS} 字 · ${p.req.pitch.length}/${LIMIT_EVENTS} 事件${tk?` · 版本 ${tk}/${r.takes.length}`:''}${ovr?' · 本句单独设置了生成参数':''}"><span class="pd"></span>P${p.n}${ovr?' ⚙':''} · ${stText(p)}${prog?` ${Math.round(prog*100)}%`:''}<span class="pu${u>.85?' hi':''}" style="width:${Math.min(100,u*100).toFixed(1)}%"></span>${prog?`<span class="pf" style="transform:scaleX(${prog})"></span>`:''}</div>`});
  if(audio.playing&&PREFS.returnOnStop&&audio.startBeat!=null)h+=`<div class="startmark" style="left:${audio.startBeat*S.ppb}px" title="停止后回到这里"></div>`;
  if(ghostBeat!=null)h+=`<div class="ghost" id="rGhost" style="left:${ghostBeat*S.ppb}px"><span>${posStr(ghostBeat)}</span></div>`;
+ if(D.cmp&&S.cmp.show!==false)D.cmp.reg.forEach(r=>{h+=`<i class="cmk" style="left:${r.b*S.ppb}px"></i>`});
  h+=`<div class="phead" id="phRuler" style="left:${S.playhead*S.ppb}px"></div>`;
  rulerIn.style.width=W+'px';rulerIn.innerHTML=h;
 }
@@ -1315,6 +1352,7 @@ function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{
  const s=$('#saveSt');if(s)s.textContent=(isDirty()?'有未保存的更改 · ':'')+'已自动保存 '+new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});},400)}
 function renderAll(o={}){
  derive();renderRoll();renderRuler();renderLanes();renderKeys();
+ renderCmpBar();
  if(!o.skipInsp)renderInspector();renderStatus();renderTopbar();persist();scheduleAuto();updLyricCnt();
 }
 
@@ -1962,7 +2000,7 @@ $('#overlay').addEventListener('click',e=>{if(e.target.closest('[data-close]')||
 const MENUS={
  file:[['新建空白工程',DESK?'Ctrl+N':'',()=>newProject()],['打开工程文件…','Ctrl+O',()=>openProject()],...(DESK?[['保存','Ctrl+S',()=>saveProject(false)],['另存为…','Ctrl+Shift+S',()=>saveProject(true)]]:[]),0,
   ['载入示例《晚风街口》','',()=>{commit(()=>{S.events=sampleEvents();S.bpm=90;$('#bpm').value=90});S.renders={};S.refF0=null;renderAll();audioGC();toast('已载入示例')}],0,
-  ['导入乐谱（MusicXML / MIDI / JSON / 标记序列）…','Ctrl+I',()=>importDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],['导出乐谱（MIDI）…','',()=>exportScore('mid')],['导出乐谱（VocalRender JSON）…','',()=>exportScore('json')],['导出乐谱（标记序列）…','',()=>exportScore('tok')],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
+  ['导入乐谱（MusicXML / MIDI / JSON / 标记序列）…','Ctrl+I',()=>importDlg()],['对比两个输入…','',()=>compareDlg()],['导出音频…','Ctrl+E',()=>exportDlg()],['导出乐谱（MIDI）…','',()=>exportScore('mid')],['导出乐谱（VocalRender JSON）…','',()=>exportScore('json')],['导出乐谱（标记序列）…','',()=>exportScore('tok')],0,['复制当前乐句的接口请求','',()=>copyApi()],...(DESK?[0,['退出','Alt+F4',()=>window.close()]]:[])],
  edit:()=>[['撤销','Ctrl+Z',undo],['重做','Ctrl+Shift+Z',doRedo],0,['全选','Ctrl+A',selectAll],['删除选中','Delete',()=>delSel(false)],['删除并保留空位','Shift+Delete',()=>delSel(true)],['删除当前乐句','',()=>{const p=curPhrase();p?deletePhrase(p.key):toast('没有可删除的乐句')}],0,['渲染所有未渲染乐句','Ctrl+R',renderPending],0,
   ['移调…','K',()=>transposeDlg()],0,['跳转到位置…','Ctrl+G',gotoPos],[(PREFS.returnOnStop?'✓ ':'')+'停止后回到起点','',()=>$('#btnReturn').click()],[(PREFS.follow?'✓ ':'')+'播放时跟随翻页','',()=>$('#btnFollow').click()],[(PREFS.autoRender?'✓ ':'')+'改动后自动渲染','',()=>{PREFS.autoRender=!PREFS.autoRender;savePrefs();renderInspector();renderStatus();if(PREFS.autoRender){toast('停止编辑约 3 秒后自动渲染改动的乐句');scheduleAuto()}else toast('已关闭自动渲染')}],0,[(PREFS.scaleHL?'✓ ':'')+'高亮调内音','',()=>{PREFS.scaleHL=!PREFS.scaleHL;savePrefs();renderAll()}],[(PREFS.scaleSnap?'✓ ':'')+'拖动时吸附调内音','',()=>{PREFS.scaleSnap=!PREFS.scaleSnap;savePrefs();renderAll()}],[(PREFS.segLines?'✓ ':'')+'显示乐句边界线','',()=>{PREFS.segLines=!PREFS.segLines;savePrefs();renderRoll()}],0,[(PREFS.clickLocate?'✓ ':'')+'单击空白处移动播放头','',()=>{PREFS.clickLocate=!PREFS.clickLocate;savePrefs();toast(PREFS.clickLocate?'单击卷帘空白处会移动播放头':'单击卷帘空白处不再移动播放头（标尺仍可定位）')}]],
  help:[['新手引导','',()=>startTour(0)],['批量歌词怎么用','',()=>startTour(TOUR.findIndex(t=>t.id==='lyrics'))],0,['快捷键','?',()=>kbDlg()],['关于 VocalRender 模型','',()=>aboutDlg()]]};
@@ -1980,7 +2018,7 @@ document.addEventListener('click',e=>{const mb=e.target.closest('[data-menu]');
  if(mb){const r=mb.getBoundingClientRect(),m=MENUS[mb.dataset.menu];popMenu(typeof m==='function'?m():m,r.left,r.bottom+4)}
 });
 function confirmDlg(t,msg,ok,fn){dialog(t,`<p style="margin:0;line-height:1.6">${esc(msg)}</p>`,`<button class="btn line" data-close>取消</button><button class="btn primary" id="cfOk">${esc(ok)}</button>`,o=>o.querySelector('#cfOk').onclick=()=>{closeDialog();fn()})}
-function kbDlg(){const K=[['播放 / 停止','Space'],['从选中音符开始播放','Shift+Space'],['停止并回到开头','Esc'],['回到开头 / 结尾','Home / End'],['移动播放头','单击或拖动标尺；单击卷帘空白处'],['从某处开始播放','双击标尺'],['跳到指定位置','单击时间码 / Ctrl+G'],['播放头前后一拍 / 一小节',', . / Shift + , .'],['上一句 / 下一句开头','Ctrl+← / Ctrl+→'],['播放头移到选中音符','L'],['移调（整首或选中部分）','K'],['在播放头处断句 / 合并','S / Shift+S'],['切换当前乐句的版本（播放时也可以）','T / Shift+T'],['收藏当前版本','F'],['定位时不吸附','按住 Alt'],['选择 / 铅笔 / 橡皮','V / B / E'],['选中前一个 / 后一个','← / →'],['音高 ±1 半音','↑ / ↓'],['音高 ±1 八度','Shift + ↑ / ↓'],['缩短 / 延长时值','[ / ]'],['编辑歌词（Tab 跳到下一个）','Enter / 双击'],['插入音符 / 休止 / 连音','N / R / M'],['删除选中','Delete / Backspace'],['删除并保留空位（改为休止）','Shift+Delete'],['框选多个（Shift/Ctrl 追加）','在空白处拖动'],['连续删除','橡皮工具拖过音符'],['删除整句、更多操作','右键音符或乐句条'],['撤销 / 重做','Ctrl+Z / Ctrl+Shift+Z'],['全选','Ctrl+A'],['渲染未渲染乐句','Ctrl+R'],['横向缩放 / 纵向缩放','Ctrl+滚轮 / Alt+滚轮']];
+function kbDlg(){const K=[['播放 / 停止','Space'],['从选中音符开始播放','Shift+Space'],['停止并回到开头','Esc'],['回到开头 / 结尾','Home / End'],['移动播放头','单击或拖动标尺；单击卷帘空白处'],['从某处开始播放','双击标尺'],['跳到指定位置','单击时间码 / Ctrl+G'],['播放头前后一拍 / 一小节',', . / Shift + , .'],['上一句 / 下一句开头','Ctrl+← / Ctrl+→'],['播放头移到选中音符','L'],['移调（整首或选中部分）','K'],['在播放头处断句 / 合并','S / Shift+S'],['切换当前乐句的版本（播放时也可以）','T / Shift+T'],['收藏当前版本','F'],['对比两个输入时切换 A / B（播放时也可以）','X'],['定位时不吸附','按住 Alt'],['选择 / 铅笔 / 橡皮','V / B / E'],['选中前一个 / 后一个','← / →'],['音高 ±1 半音','↑ / ↓'],['音高 ±1 八度','Shift + ↑ / ↓'],['缩短 / 延长时值','[ / ]'],['编辑歌词（Tab 跳到下一个）','Enter / 双击'],['插入音符 / 休止 / 连音','N / R / M'],['删除选中','Delete / Backspace'],['删除并保留空位（改为休止）','Shift+Delete'],['框选多个（Shift/Ctrl 追加）','在空白处拖动'],['连续删除','橡皮工具拖过音符'],['删除整句、更多操作','右键音符或乐句条'],['撤销 / 重做','Ctrl+Z / Ctrl+Shift+Z'],['全选','Ctrl+A'],['渲染未渲染乐句','Ctrl+R'],['横向缩放 / 纵向缩放','Ctrl+滚轮 / Alt+滚轮']];
  dialog('快捷键',`<div class="kb-grid">${K.map(([a,b])=>`<span>${a}</span><kbd>${b}</kbd>`).join('')}</div>`)}
 function aboutDlg(){dialog('关于 VocalRender',`<div style="line-height:1.75;font-size:13px">${DESK?`<p style="margin-top:0"><b>VocalRender Studio 桌面版 v${esc(DESK.info.version||'')}</b></p>`:''}
  <p style="margin-top:0">VocalRender 是乐谱原生（score-native）的歌声合成模型：直接读取歌词、MIDI 音高、音符时值和全局速度，生成 48 kHz 歌声，不需要逐音素时长或对齐好的参考音频。</p>
@@ -2343,6 +2381,138 @@ function importDlg(prefill){
    const ps=S.events.filter(e=>e.kind==='note').map(e=>e.pitch);if(ps.length)roll.scrollTop=(MAXP-ps.reduce((a,b)=>a+b)/ps.length)*S.rowH-roll.clientHeight/2;
    toast(`已导入 ${q.notes} 个音符 · ${S.bpm} BPM${S.refF0?' · 灰线是原唱音高':''}，可用 Ctrl+Z 撤销${rangeHint()}`)};
  })}
+/* ================= compare two inputs ================= */
+// Two scores (say, two transcriptions of the same song) share the piano roll: one is the working score (S.events), the other is
+// kept in S.cmp.other and drawn as dashed ghost notes. X swaps them, also while playing, so they can be heard against each other.
+// Notes are lined up by time in seconds, so the two may have different tempos. Renders belong to their own score (phrase keys are
+// event ids), so both can be rendered and compared as sung.
+function restoreCmp(c){if(!c||!c.other||!Array.isArray(c.other.events)||!c.names)return null;
+ const fix=o=>({events:o.events.map(e=>({...e,id:e.id||uid()})),bpm:+o.bpm||90,bpb:+o.bpb||4});
+ return{cur:c.cur==='b'?'b':'a',names:{a:String(c.names.a||'A'),b:String(c.names.b||'B')},show:c.show!==false,prev:c.prev&&Array.isArray(c.prev.events)?fix(c.prev):null,other:{...fix(c.other),hist:[],redo:[]}}}
+// A score in any format the import dialog reads, with the import defaults (recommended part, file tempo, 1/32 grid)
+function scoreFromInfo(I){const pt=I.parts[I.def];if(!pt)throw new Error('没有找到旋律声部');const m=midiSegment(I,pt,I.bpm,true),q=quantizeTranscript([m.seg],I.bpm,1);
+ return{events:q.events,bpm:I.bpm,bpb:sigOkOf(I)?I.sig.num:null,kind:(I.fmt==='xml'?'MusicXML':'MIDI')+(I.parts.length>1?`（${I.parts.length} 个声部，取“${pt.name}”）`:'')}}
+function readScoreText(text){text=text.replace(/^﻿/,'').trim();if(!text)throw new Error('内容是空的');
+ if(/^</.test(text)&&isXmlText(text))return scoreFromInfo(musicXmlInfo(text,''));
+ if(!/^[\[{]/.test(text)){if(!isTokenScore(text))throw new Error('没认出格式：不是标记序列、JSON 或 MusicXML');const r=parseTokenScore(text);return{events:r.ev,bpm:r.bpm||S.bpm,kind:'标记序列'+(r.bpm?'':'（没写速度，按当前速度）')}}
+ let d;try{d=JSON.parse(text)}catch(e){throw new Error('不是有效的 JSON：'+e.message)}
+ if(d&&d.format==='vocalrender-studio-project'&&Array.isArray(d.events))return{events:d.events.map(e=>({...e,id:uid()})),bpm:+d.bpm||90,bpb:+d.bpb||null,kind:'工程文件'};
+ if(isTranscript(d)){const segs=parseTranscript(d),bpm=estimateBpm(segs);return{events:quantizeTranscript(segs,bpm,1).events,bpm,kind:'带时长的歌唱转写（自动检测速度）'}}
+ if(isLabel(d)){const x=Array.isArray(d)?d[0]:d;return{events:fromLabel(x),bpm:+x.bpm||S.bpm,kind:'VocalRender 标注'}}
+ throw new Error('没认出这个 JSON 的格式')}
+async function readScoreFile(bytes,name){
+ if(bytes[0]===0x4D&&bytes[1]===0x54&&bytes[2]===0x68&&bytes[3]===0x64)return scoreFromInfo(midiInfo(parseMIDI(bytes),name));
+ if((bytes[0]===0x50&&bytes[1]===0x4B)||/\.(musicxml|mxl|xml)$/i.test(name)){const text=await musicXmlText(bytes);if(!isXmlText(text))throw new Error('不是 MusicXML 乐谱');return scoreFromInfo(musicXmlInfo(text,name))}
+ return readScoreText(new TextDecoder().decode(bytes))}
+// the events of a score with their times in seconds
+function scoreItems(events,bpm){const spb=60/bpm,out=[];let t=0;events.forEach((e,i)=>{const d=beats(e)*spb,n=e.kind==='note';out.push({i,n,s:t,e:t+d,d,p:n?e.pitch:0,w:n?e.word:e.kind});t+=d});return out}
+const scoreSig=ev=>ev.map(e=>e.kind[0]+e.word+','+e.pitch+','+e.dur).join(';');
+// How the two scores differ. Their events are lined up as two sequences (like a text diff), so one extra or longer note does not make
+// everything after it count as different; where the same note ends up at a different time, the other score's note is still drawn.
+// cur: index of a differing event in the working score -> how; ghost: the other score's events to draw; reg: places where they
+// differ (beat in the working score's tempo, with a pitch to scroll to), for jumping from one to the next
+let cmpCache=null;
+function cmpDiff(){
+ const c=S.cmp,o=c.other,sig=S.bpm+'|'+o.bpm+'|'+scoreSig(S.events)+'|'+(o.sig||(o.sig=scoreSig(o.events)));
+ if(cmpCache&&cmpCache.sig===sig)return cmpCache;
+ const spb=60/S.bpm,A=scoreItems(S.events,S.bpm),B=scoreItems(o.events,o.bpm),tol=.03,n=A.length,m=B.length;
+ // cost of saying a and b are "the same event, changed": never a note against a rest
+ const cost=(a,b)=>a.n!==b.n?9:(a.p!==b.p?1:0)+(a.w!==b.w?1:0)+(Math.abs(a.d-b.d)>tol?.6:0);
+ const pa=new Array(n).fill(-1);let lo=0;while(lo<n&&lo<m&&cost(A[lo],B[lo])===0){pa[lo]=lo;lo++}
+ let ha=n,hb=m;while(ha>lo&&hb>lo&&cost(A[ha-1],B[hb-1])===0){ha--;hb--;pa[ha]=hb}
+ const N=ha-lo,M=hb-lo;
+ if(N&&M&&N*M<=6e6){const W=M+1,dir=new Uint8Array((N+1)*W);let prev=new Float32Array(W),row=new Float32Array(W);
+  for(let y=1;y<=M;y++){prev[y]=y;dir[y]=2}
+  for(let x=1;x<=N;x++){row[0]=x;dir[x*W]=1;const a=A[lo+x-1];
+   for(let y=1;y<=M;y++){const d=prev[y-1]+cost(a,B[lo+y-1]),u=prev[y]+1,l=row[y-1]+1;
+    if(d<=u&&d<=l){row[y]=d;dir[x*W+y]=0}else if(u<=l){row[y]=u;dir[x*W+y]=1}else{row[y]=l;dir[x*W+y]=2}}
+   const t=prev;prev=row;row=t}
+  for(let x=N,y=M;x>0&&y>0;){const d=dir[x*W+y];if(d===0){pa[lo+x-1]=lo+y-1;x--;y--}else if(d===1)x--;else y--}}
+ else for(let x=0;x<Math.min(N,M);x++)if(A[lo+x].n===B[lo+x].n)pa[lo+x]=lo+x;   // far too long to line up properly: pair them in order
+ const pb=new Array(m).fill(-1);pa.forEach((y,x)=>{if(y>=0)pb[y]=x});
+ const cnt={pitch:0,word:0,dur:0,rest:0,onlyCur:0,onlyOther:0},cur=new Map(),ghost=[],marks=[];let drift=0;
+ A.forEach((a,x)=>{const y=pa[x];
+  if(y<0){a.n?cnt.onlyCur++:cnt.rest++;cur.set(a.i,{only:true});marks.push([a.s,a.p]);return}
+  const b=B[y],f=b.f={pitch:a.p!==b.p,word:a.w!==b.w,dur:Math.abs(a.d-b.d)>tol,shift:Math.abs(a.s-b.s)>tol};drift=Math.max(drift,Math.abs(a.s-b.s));
+  if(f.pitch||f.word||f.dur){if(!a.n)cnt.rest++;else{if(f.pitch)cnt.pitch++;if(f.word)cnt.word++;if(f.dur)cnt.dur++}cur.set(a.i,{...f,ow:b.w,op:b.p});marks.push([Math.min(a.s,b.s),a.p||b.p])}});
+ B.forEach((b,y)=>{const only=pb[y]<0;if(only){b.n?cnt.onlyOther++:cnt.rest++;marks.push([b.s,b.p])}
+  if(only||b.f.dur||(b.n&&(b.f.pitch||b.f.shift))||(!b.n&&b.f.word))ghost.push({x:b.s/spb,w:b.d/spb,p:b.p,word:b.w,only,rest:!b.n})});
+ marks.sort((a,b)=>a[0]-b[0]);const reg=[];let last=-9;marks.forEach(([t,p])=>{const bt=t/spb;if(bt-last>1)reg.push({b:bt,p});else if(!reg[reg.length-1].p)reg[reg.length-1].p=p;last=bt});
+ return cmpCache={sig,cur,ghost,cnt,reg,drift,n:marks.length}}
+function renderCmpBar(){const el=$('#cmpBar'),c=S.cmp;el.hidden=!c;if(!c){if(el.innerHTML)el.innerHTML='';return}
+ const d=D.cmp,k=d.cnt,cu=c.cur.toUpperCase(),oth=c.cur==='a'?'B':'A';
+ const parts=[k.pitch&&`音高 <b>${k.pitch}</b>`,k.word&&`歌词 <b>${k.word}</b>`,k.dur&&`时值 <b>${k.dur}</b>`,k.onlyCur&&`只在 ${cu} 的音 <b>${k.onlyCur}</b>`,k.onlyOther&&`只在 ${oth} 的音 <b>${k.onlyOther}</b>`,k.rest&&`休止/换气 <b>${k.rest}</b>`].filter(Boolean);
+ el.innerHTML=`<span class="ttl">对比</span>
+  <div class="ab" role="group" aria-label="切换试听 A / B">${['a','b'].map(x=>`<button data-cmp="${x}" class="${c.cur===x?'on':''}" aria-pressed="${c.cur===x}" title="${esc(c.names[x])}${c.cur===x?'：现在看到和听到的是这一份':'：点击切换到这一份 (X)'}"><span class="k">${x.toUpperCase()}</span><span class="nm">${esc(c.names[x])}</span></button>`).join('')}</div>
+  <span class="hint" title="按 X 在 A 和 B 之间切换，播放中也可以：播放头留在同一时间继续播"><span class="kbd">X</span> 切换</span>
+  <span class="df"${d.drift>.03?` title="同一个音在两份里的时间最多差 ${d.drift.toFixed(2)} 秒"`:''}>${d.n?`不同：${parts.join(' · ')}`:'两份完全一样'}${d.drift>.03?` · 最多错开 <b>${d.drift.toFixed(2)}</b> 秒`:''}</span>
+  ${d.reg.length?`<div class="seg"><button class="btn" data-cmpnav="-1" title="跳到上一处不同">‹ 上一处</button><button class="btn" data-cmpnav="1" title="跳到下一处不同">下一处 ›</button></div>`:''}
+  <span class="sp"></span>
+  <label title="用虚线框画出 ${oth} 里音高、时值或位置不一样的音；歌词不同的音下面标出 ${oth} 的字"><input type="checkbox" id="cmpShow" ${c.show!==false?'checked':''}> 叠加显示 ${oth}</label>
+  <button class="btn line" data-cmpend style="height:26px">结束对比…</button>`}
+// switch which of the two is the working score; the playhead stays at the same time, and playback carries on
+function cmpSwap(){const c=S.cmp;if(!c||drag||lyrEdit)return;
+ const was=audio.playing,sec=S.playhead*60/S.bpm,sb=was&&audio.startBeat!=null?audio.startBeat*60/S.bpm:null;if(was)pause();
+ const o=c.other;c.other={events:S.events,bpm:S.bpm,bpb:S.bpb,hist,redo};
+ S.events=o.events;S.bpm=o.bpm;S.bpb=o.bpb||S.bpb;hist=o.hist||[];redo=o.redo||[];c.cur=c.cur==='a'?'b':'a';
+ S.sel.clear();S.curPhrase=null;$('#bpm').value=S.bpm;$('#bpb').value=S.bpb;
+ renderAll();setPlayhead(sec*S.bpm/60);
+ if(was){play();if(sb!=null){audio.startBeat=sb*S.bpm/60;renderRuler()}}
+}
+function cmpNav(dir){const r=D.cmp&&D.cmp.reg;if(!r||!r.length)return;const b=S.playhead;
+ const t=(dir>0?r.find(x=>x.b>b+.01):[...r].reverse().find(x=>x.b<b-.01))||(dir>0?r[0]:r[r.length-1]);
+ seek(t.b);const x=t.b*S.ppb,y=(MAXP-t.p)*S.rowH;
+ if(x<roll.scrollLeft+40||x>roll.scrollLeft+roll.clientWidth-160)roll.scrollLeft=Math.max(0,x-roll.clientWidth/3);
+ if(y<roll.scrollTop+20||y>roll.scrollTop+roll.clientHeight-60)roll.scrollTop=y-roll.clientHeight/2}
+// A / B: [name, events, bpm, bpb, isCur (the score that is in the editor now)]
+function cmpStart(A,B){if(audio.playing)pause();
+ const old=S.cmp&&S.cmp.prev,prev=A.isCur||B.isCur?null:old||(S.events.some(e=>e.kind==='note')?{events:S.events,bpm:S.bpm,bpb:S.bpb}:null);
+ S.cmp={cur:'a',names:{a:A.name,b:B.name},show:true,prev,other:{events:B.events,bpm:B.bpm,bpb:B.bpb||S.bpb,hist:B.isCur?hist:[],redo:B.isCur?redo:[]}};
+ if(!A.isCur){hist=[];redo=[];S.refF0=null;S.refShift=[]}
+ S.events=A.events;S.bpm=A.bpm;S.bpb=A.bpb||S.bpb;S.sel.clear();S.curPhrase=null;$('#bpm').value=S.bpm;$('#bpb').value=S.bpb;
+ setPlayhead(0);renderAll();roll.scrollLeft=0;
+ const ps=S.events.filter(e=>e.kind==='note').map(e=>e.pitch);if(ps.length)roll.scrollTop=(MAXP-ps.reduce((a,b)=>a+b)/ps.length)*S.rowH-roll.clientHeight/2;
+ toast(D.cmp.n?`两份有 ${D.cmp.n} 处不同，卷帘上用绿色标出。按 X 或点 A / B 切换试听`:'两份乐谱完全一样')}
+// keep one of the two (or go back to the score from before the comparison) and leave compare mode
+function cmpEnd(which){const c=S.cmp;if(!c)return;if(audio.playing)pause();
+ if(which==='prev'){if(!c.prev)return;S.events=c.prev.events;S.bpm=c.prev.bpm;S.bpb=c.prev.bpb;hist=[];redo=[]}
+ else if(which!==c.cur)cmpSwap();
+ const name=which==='prev'?'':c.names[which];S.cmp=null;S.sel.clear();S.curPhrase=null;$('#bpm').value=S.bpm;$('#bpb').value=S.bpb;
+ // the renders of the score that was not kept go away with it
+ const ids=new Set(S.events.map(e=>e.id));Object.keys(S.renders).forEach(k=>{if(ids.has(k))return;const r=S.renders[k];if(r&&r.job){const qi=queue.indexOf(k);if(qi>=0)queue.splice(qi,1);r.job.abort&&r.job.abort();r.job=null}delete S.renders[k]});
+ setPlayhead(Math.min(S.playhead,D.total||0));renderAll();audioGC();
+ toast(which==='prev'?'已结束对比，回到对比前的乐谱':`已采用 ${which.toUpperCase()}（${name}），对比结束`)}
+$('#cmpBar').addEventListener('click',e=>{const c=S.cmp;if(!c)return;
+ const sw=e.target.closest('[data-cmp]');if(sw){if(sw.dataset.cmp!==c.cur)cmpSwap();return}
+ const nv=e.target.closest('[data-cmpnav]');if(nv){cmpNav(+nv.dataset.cmpnav);return}
+ const en=e.target.closest('[data-cmpend]');if(en){e.stopPropagation();const r=en.getBoundingClientRect();
+  popMenu([[`采用 A：${c.names.a}`,'',()=>cmpEnd('a')],[`采用 B：${c.names.b}`,'',()=>cmpEnd('b')],...(c.prev?[0,['都不要，回到对比前的乐谱','',()=>cmpEnd('prev')]]:[])],r.left,r.bottom+4)}});
+$('#cmpBar').addEventListener('change',e=>{if(e.target.id==='cmpShow'&&S.cmp){S.cmp.show=e.target.checked;renderAll()}});
+function compareDlg(){
+ const hasCur=S.events.some(e=>e.kind==='note'),st={a:null,b:null};
+ const slot=k=>`<div class="cmp-slot" data-slot="${k}"><div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap"><span class="cmp-k">${k.toUpperCase()}</span><label class="btn line" for="cmpF${k}">选择文件…</label><input type="file" id="cmpF${k}" data-file="${k}" multiple accept=".txt,.json,.vrproj,.mid,.midi,.kar,.musicxml,.xml,.mxl" hidden>${hasCur?`<button class="btn line" data-usecur="${k}">${S.cmp?'用当前这一份':'用当前乐谱'}</button>`:''}</div>
+  <textarea class="inp" data-paste="${k}" spellcheck="false" placeholder="或者把标记序列 / JSON 粘贴到这里"></textarea><div class="hint" data-info="${k}">还没有选择</div></div>`;
+ dialog('对比两个输入',`<p class="hint" style="margin:0 0 12px">选两份乐谱：标记序列（.txt）、JSON、MIDI、MusicXML 都可以，也可以在文件框里一次选中两个文件。两份会叠在同一个卷帘上，标出不同的音，可以随时切换试听，最后选定一份。</p>${slot('a')}${slot('b')}<p class="hint" id="cmpWarn"></p>`,
+ `<button class="btn line" data-close>取消</button><button class="btn primary" id="cmpGo" disabled>开始对比</button>`,o=>{
+  const go=o.querySelector('#cmpGo'),q=(sel)=>o.querySelector(sel);
+  const upd=()=>{['a','b'].forEach(k=>{const v=st[k],box=q(`[data-slot="${k}"]`),info=q(`[data-info="${k}"]`);box.classList.toggle('ok',!!(v&&!v.err));
+    if(!v){info.textContent='还没有选择';info.style.color='';return}
+    if(v.err){info.textContent=`无法读取${v.name?' '+v.name:''}：${v.err}`;info.style.color='var(--err)';return}
+    const ns=v.events.filter(e=>e.kind==='note'),ps=ns.map(e=>e.pitch),sec=v.events.reduce((t,e)=>t+beats(e),0)*60/v.bpm;info.style.color='';
+    info.innerHTML=`<b style="color:var(--fg)">${esc(v.name)}</b> · ${esc(v.kind)} · ${ns.length} 个音符 · ${v.bpm} BPM · ${ps.length?pname(Math.min(...ps))+'–'+pname(Math.max(...ps)):'没有音符'} · ${fmtTime(sec).slice(0,5)}`});
+   const a=st.a,b=st.b,ok=a&&b&&!a.err&&!b.err&&a.events.some(e=>e.kind==='note')&&b.events.some(e=>e.kind==='note');go.disabled=!ok;
+   const keepPrev=hasCur&&!(a&&a.isCur)&&!(b&&b.isCur)&&!S.cmp;
+   q('#cmpWarn').textContent=ok&&a.bpm!==b.bpm?`两份的速度不同（${a.bpm} / ${b.bpm} BPM），会按时间对齐显示。${keepPrev?'当前乐谱会先收起来，结束对比时可以恢复。':''}`:keepPrev?'当前乐谱会先收起来，结束对比时可以选择恢复。':'';
+   o.querySelectorAll('[data-usecur]').forEach(x=>{const k=x.dataset.usecur,ot=k==='a'?'b':'a';x.disabled=!!(st[ot]&&st[ot].isCur)})};
+  const setFile=async(k,f)=>{const pa=q(`[data-paste="${k}"]`);pa.value='';try{st[k]={name:f.name,...await readScoreFile(new Uint8Array(await f.arrayBuffer()),f.name)}}catch(e){st[k]={name:f.name,err:e.message}}upd()};
+  o.querySelectorAll('[data-file]').forEach(inp=>inp.addEventListener('change',async e=>{const fs=[...e.target.files],k=inp.dataset.file,ot=k==='a'?'b':'a';e.target.value='';if(!fs.length)return;
+   await setFile(k,fs[0]);if(fs[1])await setFile(ot,fs[1])}));
+  o.querySelectorAll('[data-paste]').forEach(ta=>{let t=0;ta.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{const k=ta.dataset.paste,v=ta.value.trim();
+   if(!v)st[k]=null;else{try{st[k]={name:'粘贴的乐谱 '+k.toUpperCase(),...readScoreText(v)}}catch(e){st[k]={name:'',err:e.message}}}upd()},250)})});
+  o.querySelectorAll('[data-usecur]').forEach(x=>x.onclick=()=>{const k=x.dataset.usecur;q(`[data-paste="${k}"]`).value='';
+   st[k]={name:S.cmp?S.cmp.names[S.cmp.cur]:(fileRef?fileRef.name.replace(/\.vrproj$/i,''):S.name)||'当前乐谱',events:S.events,bpm:S.bpm,bpb:S.bpb,kind:'编辑器里现在的乐谱',isCur:true};upd()});
+  go.onclick=()=>{const a=st.a,b=st.b;closeDialog();cmpStart(a,b)};
+  upd()})}
 // Files opened or dropped: a project, or a score to import
 function openJSONText(text,ref,fname){if(!/^\s*[\[{]/.test(text)&&isTokenScore(text)){importDlg(text);return}
  let d;try{d=JSON.parse(text)}catch(e){throw new Error('文件不是有效的 JSON，也不是 VocalRender 标记序列')}
@@ -2437,7 +2607,8 @@ function http(url,init={}){
 }
 function projectData(){const renders={};Object.entries(S.renders).forEach(([k,r])=>{if(r.takes.length)renders[k]={takes:r.takes.map(t=>({...t,svc:takeSvc(t),buffer:undefined})),active:r.active,job:null}});
  const customVoices=S.customVoices.filter(v=>v._b64||v.buffer).map(v=>({id:v.id,name:v.name,dur:+(+v.dur).toFixed(3),sr:v.sr,ch:v.ch,consent:!!v.consent,wav:voiceB64(v)}));
- return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,customVoices,refF0:S.refF0||null,refShift:S.refShift||[],phraseGen:S.phraseGen||{},key:S.key||null,renders}}
+ return{format:'vocalrender-studio-project',version:1,name:S.name,bpm:S.bpm,bpb:S.bpb,events:S.events,voice:S.voice,ckpt:S.ckpt,gen:S.gen,customVoices,refF0:S.refF0||null,refShift:S.refShift||[],phraseGen:S.phraseGen||{},key:S.key||null,renders,
+  compare:S.cmp?{cur:S.cmp.cur,names:S.cmp.names,show:S.cmp.show!==false,prev:S.cmp.prev||null,other:{events:S.cmp.other.events,bpm:S.cmp.other.bpm,bpb:S.cmp.other.bpb}}:null}}
 const projectJSON=()=>JSON.stringify(projectData());
 const isDirty=()=>!!fileRef&&savedJSON!==projectJSON();
 function updateTitle(){if(!DESK)return;document.title=(isDirty()?'● ':'')+(fileRef?fileRef.name.replace(/\.vrproj$/i,''):S.name)+' - VocalRender Studio'}
@@ -2446,7 +2617,7 @@ function loadProject(o,ref){
  if(audio.playing)pause();queue.length=0;
  if(Array.isArray(o.customVoices))restoreVoices(o.customVoices);
  Object.assign(S,{name:o.name||'未命名工程',bpm:+o.bpm||90,bpb:+o.bpb||4,events:o.events.map(e=>({...e,id:e.id||uid()})),voice:[...VOICES,...S.customVoices].some(v=>v.id===o.voice)?o.voice:'Alto-1',ckpt:o.ckpt||'VocalRender-Pro',renders:o.renders||{}});
- Object.values(S.renders).forEach(r=>r.job=null);if(o.gen)Object.assign(S.gen,o.gen);S.refF0=o.refF0||null;S.refShift=o.refShift||[];S.phraseGen=o.phraseGen||{};S.key=o.key||null;
+ Object.values(S.renders).forEach(r=>r.job=null);if(o.gen)Object.assign(S.gen,o.gen);S.refF0=o.refF0||null;S.refShift=o.refShift||[];S.phraseGen=o.phraseGen||{};S.key=o.key||null;S.cmp=restoreCmp(o.compare);
  S.sel.clear();S.curPhrase=null;S.playhead=0;hist=[];redo=[];perfCache.clear();
  $('#bpm').value=S.bpm;$('#bpb').value=S.bpb;$('#ckpt').value=S.ckpt;$('#projName').value=S.name;
  hydrateAudio(o.audio&&typeof o.audio==='object'?o.audio:null);   // marks the takes as loading right away, so they do not flash "音频已丢失"
@@ -2696,6 +2867,7 @@ document.addEventListener('keydown',e=>{
   case 's':case 'S':e.preventDefault();e.shiftKey?mergeAtPlayhead():splitAtPlayhead();break;
   case 't':case 'T':e.preventDefault();cycleTake(e.shiftKey?-1:1);break;
   case 'f':case 'F':e.preventDefault();toggleFav();break;
+  case 'x':case 'X':if(S.cmp){e.preventDefault();cmpSwap()}break;
   case 'Escape':if(openMenu){openMenu.remove();openMenu=null}else if(audio.playing||S.playhead)stop();else{S.sel.clear();renderAll()}break;
   case 'Home':e.preventDefault();seek(0);roll.scrollLeft=0;break;
   case 'End':e.preventDefault();seek(D.total);break;
